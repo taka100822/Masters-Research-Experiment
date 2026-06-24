@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using TMPro;
@@ -5,35 +7,55 @@ using StarterAssets;
 
 public class DialogueManager : MonoBehaviour
 {
+    [Header("UI")]
     [SerializeField] private GameObject dialoguePanel;
     [SerializeField] private GameObject talkHint;
     [SerializeField] private GameObject nextIndicator;
+    [SerializeField] private GameObject choicePanel;
 
+    [Header("Text")]
     [SerializeField] private TMP_Text nameText;
     [SerializeField] private TMP_Text dialogueText;
+    [SerializeField] private TMP_Text[] choiceTexts;
 
+    [Header("Player")]
     [SerializeField] private ThirdPersonController playerController;
 
     private NPCDialogue currentNPC;
     private DialogueDatabase dialogueDatabase;
 
-    private string[] currentLines;
-    private int currentLineIndex;
-    
+    // CSVノード制御
+    private int currentNodeId;
+    private DialogueDatabase.Node currentNode;
 
-    private bool isOpen = false;
+    // 選択肢
+    private List<Choice> choices = new List<Choice>();
+    private int choiceIndex = 0;
 
+    // =========================
+    // 初期化
+    // =========================
     private void Start()
     {
         dialoguePanel.SetActive(false);
         talkHint.SetActive(false);
         nextIndicator.SetActive(false);
+        choicePanel.SetActive(false);
 
         dialogueDatabase = FindAnyObjectByType<DialogueDatabase>();
     }
 
+    // =========================
+    // Update
+    // =========================
     private void Update()
     {
+        if (choicePanel.activeSelf)
+        {
+            HandleChoiceInput();
+            return;
+        }
+
         if (!GameManager.Instance.IsFree())
         {
             HandleDialogueInput();
@@ -41,63 +63,45 @@ public class DialogueManager : MonoBehaviour
         }
 
         HandleFreeMoveInput();
+    }
 
-        // ⭐ここ追加
-        HandleTalkInput();
+    private bool SubmitPressed()
+    {
+        return
+            Keyboard.current.enterKey.wasPressedThisFrame ||
+            Keyboard.current.numpadEnterKey.wasPressedThisFrame ||
+            Mouse.current.leftButton.wasPressedThisFrame;
     }
 
     // =========================
-    // 自由移動時
+    // 自由移動
     // =========================
     private void HandleFreeMoveInput()
     {
-        if (currentNPC != null)
-        {
-            talkHint.SetActive(true);
-        }
-        else
-        {
-            talkHint.SetActive(false);
-        }
+        // Debug.Log("CLICK DETECTED");
+        // Debug.Log("NPC = " + (currentNPC != null));
+        talkHint.SetActive(currentNPC != null);
 
-        bool talk =
-            Keyboard.current.enterKey.wasPressedThisFrame ||
-            Keyboard.current.numpadEnterKey.wasPressedThisFrame ||
-            Mouse.current.leftButton.wasPressedThisFrame;
+        if (!SubmitPressed() || currentNPC == null)
+            return;
 
-        if (!talk) return;
+        dialogueDatabase.LoadCSV(
+            "Dialogue/" + currentNPC.csvFileName
+        );
 
-        if (currentNPC == null) return;
-
-        string[] lines =
-            dialogueDatabase.GetDialogue(currentNPC.npcId);
-
-        OpenDialogue(currentNPC.npcId, lines);
+        StartNode(0);
     }
 
     // =========================
-    // 会話中
+    // ノード開始
     // =========================
-    private void HandleDialogueInput()
+    private void StartNode(int id)
     {
-        bool advance =
-            Keyboard.current.enterKey.wasPressedThisFrame ||
-            Keyboard.current.numpadEnterKey.wasPressedThisFrame ||
-            Mouse.current.leftButton.wasPressedThisFrame;
-
-        if (!advance) return;
-
-        NextLine();
-    }
-
-    // =========================
-    // 会話開始
-    // =========================
-    public void OpenDialogue(string speakerName, string[] lines)
-    {
-        if (lines == null || lines.Length == 0) return;
-
-        isOpen = true;
+        Debug.Log("StartNode called: " + id);
+        
+        currentNodeId = id;
+        currentNode = dialogueDatabase.GetNode(id);
+        Debug.Log("Node = " + currentNode);
 
         GameManager.Instance.SetState(GameState.InDialogue);
 
@@ -106,32 +110,77 @@ public class DialogueManager : MonoBehaviour
 
         playerController.enabled = false;
 
-        nameText.text = speakerName;
-
-        currentLines = lines;
-        currentLineIndex = 0;
-
-        dialogueText.text = currentLines[currentLineIndex];
-
-        nextIndicator.SetActive(currentLines.Length > 1);
+        ShowNode();
     }
 
     // =========================
-    // 次の行へ
+    // ノード表示
     // =========================
-    private void NextLine()
+    private void ShowNode()
     {
-        currentLineIndex++;
-
-        if (currentLineIndex >= currentLines.Length)
+        if (currentNode == null)
         {
             CloseDialogue();
             return;
         }
 
-        dialogueText.text = currentLines[currentLineIndex];
+        dialogueText.text = currentNode.text;
+        nameText.text = currentNPC.npcId;
 
-        nextIndicator.SetActive(currentLineIndex < currentLines.Length - 1);
+        ShowChoicesFromNode();
+    }
+
+    // =========================
+    // 選択肢生成（CSV）
+    // =========================
+    private void ShowChoicesFromNode()
+    {
+        var list = new List<Choice>();
+
+        if (!string.IsNullOrEmpty(currentNode.choiceA))
+        {
+            list.Add(new Choice
+            {
+                text = currentNode.choiceA,
+                onSelect = () => GoToNode(currentNode.choiceA_next)
+            });
+        }
+
+        if (!string.IsNullOrEmpty(currentNode.choiceB))
+        {
+            list.Add(new Choice
+            {
+                text = currentNode.choiceB,
+                onSelect = () => GoToNode(currentNode.choiceB_next)
+            });
+        }
+
+        if (list.Count > 0)
+        {
+            ShowChoices(list);
+            nextIndicator.SetActive(false);
+        }
+        else
+        {
+            nextIndicator.SetActive(true);
+        }
+    }
+
+    // =========================
+    // ノード移動
+    // =========================
+    private void GoToNode(int id)
+    {
+        if (id < 0)
+        {
+            CloseDialogue();
+            return;
+        }
+
+        currentNodeId = id;
+        currentNode = dialogueDatabase.GetNode(id);
+
+        ShowNode();
     }
 
     // =========================
@@ -139,40 +188,107 @@ public class DialogueManager : MonoBehaviour
     // =========================
     public void CloseDialogue()
     {
-        isOpen = false;
-
         GameManager.Instance.SetState(GameState.FreeMove);
 
         dialoguePanel.SetActive(false);
+        choicePanel.SetActive(false);
         nextIndicator.SetActive(false);
 
         playerController.enabled = true;
+
+        if (currentNPC != null)
+        {
+            currentNPC.GetComponent<NPCInteraction>()
+                .SetBubbleVisible(true);
+        }
     }
 
     // =========================
-    // NPC登録（Trigger側から呼ぶ）
+    // NPCセット
     // =========================
     public void SetCurrentNPC(NPCDialogue npc)
     {
         currentNPC = npc;
-
-        talkHint.SetActive(npc != null && GameManager.Instance.IsFree());
     }
 
-    private void HandleTalkInput()
+    // =========================
+    // 選択肢UI
+    // =========================
+    public void ShowChoices(List<Choice> newChoices)
     {
-        if (currentNPC == null) return;
+        choices = newChoices;
+        choiceIndex = 0;
 
-        bool talk =
-            Keyboard.current.enterKey.wasPressedThisFrame ||
-            Keyboard.current.numpadEnterKey.wasPressedThisFrame ||
-            Mouse.current.leftButton.wasPressedThisFrame;
+        choicePanel.SetActive(true);
+        UpdateChoiceUI();
 
-        if (!talk) return;
+        playerController.enabled = false;
+    }
 
-        string[] lines =
-            dialogueDatabase.GetDialogue(currentNPC.npcId);
+    private void UpdateChoiceUI()
+    {
+        for (int i = 0; i < choiceTexts.Length; i++)
+        {
+            if (i < choices.Count)
+            {
+                choiceTexts[i].text = choices[i].text;
+                choiceTexts[i].color =
+                    (i == choiceIndex) ? Color.yellow : Color.white;
+            }
+            else
+            {
+                choiceTexts[i].text = "";
+            }
+        }
+    }
 
-        OpenDialogue(currentNPC.npcId, lines);
+    private void HandleChoiceInput()
+    {
+        if (Keyboard.current.upArrowKey.wasPressedThisFrame)
+        {
+            choiceIndex--;
+            if (choiceIndex < 0) choiceIndex = choices.Count - 1;
+            UpdateChoiceUI();
+        }
+
+        if (Keyboard.current.downArrowKey.wasPressedThisFrame)
+        {
+            choiceIndex++;
+            if (choiceIndex >= choices.Count) choiceIndex = 0;
+            UpdateChoiceUI();
+        }
+
+        if (SubmitPressed())
+        {
+            choicePanel.SetActive(false);
+            choices[choiceIndex].onSelect?.Invoke();
+        }
+    }
+
+    private void HandleDialogueInput()
+    {
+        if (!SubmitPressed()) return;
+
+        // 選択肢が出ているなら無視
+        if (choicePanel.activeSelf)
+            return;
+
+        if (currentNode.nextId >= 0)
+        {
+            GoToNode(currentNode.nextId);
+        }
+        else
+        {
+            CloseDialogue();
+        }
+    }
+
+    // =========================
+    // 選択肢クラス
+    // =========================
+    public class Choice
+    {
+        public string text;
+        public Action onSelect;
     }
 }
