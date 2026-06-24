@@ -2,26 +2,21 @@ using UnityEngine;
 
 public class NPCInteraction : MonoBehaviour
 {
-    private DialogueManager dialogueManager;
-    private NPCDialogue npcDialogue;
-
-    // [SerializeField] private GameObject exclamationUI;
+    [SerializeField] private GameObject bubbleUI;
 
     private void Start()
     {
-        dialogueManager = FindAnyObjectByType<DialogueManager>();
-        npcDialogue = GetComponent<NPCDialogue>();
-
-        // exclamationUI.transform.position =
-        // Camera.main.transform.position + Camera.main.transform.forward * 2f;
-        // exclamationUI.SetActive(true);
+        bubbleUI.SetActive(false);
     }
 
     private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("Player"))
         {
-            dialogueManager.SetCurrentNPC(npcDialogue);
+            bubbleUI.SetActive(true);
+
+            FindAnyObjectByType<DialogueManager>()
+                .SetCurrentNPC(GetComponent<NPCDialogue>());
         }
     }
 
@@ -29,7 +24,7 @@ public class NPCInteraction : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            dialogueManager.SetCurrentNPC(null);
+            bubbleUI.SetActive(false);
         }
     }
 }

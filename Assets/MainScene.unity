@@ -65093,6 +65093,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 218a94c914fe24b4ebcf64113b3406be, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NPCInteraction
+  bubbleUI: {fileID: 1518905925}
 --- !u!135 &1519829572
 SphereCollider:
   m_ObjectHideFlags: 0

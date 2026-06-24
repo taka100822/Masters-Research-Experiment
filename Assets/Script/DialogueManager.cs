@@ -19,6 +19,7 @@ public class DialogueManager : MonoBehaviour
 
     private string[] currentLines;
     private int currentLineIndex;
+    
 
     private bool isOpen = false;
 
@@ -40,6 +41,9 @@ public class DialogueManager : MonoBehaviour
         }
 
         HandleFreeMoveInput();
+
+        // ⭐ここ追加
+        HandleTalkInput();
     }
 
     // =========================
@@ -153,5 +157,22 @@ public class DialogueManager : MonoBehaviour
         currentNPC = npc;
 
         talkHint.SetActive(npc != null && GameManager.Instance.IsFree());
+    }
+
+    private void HandleTalkInput()
+    {
+        if (currentNPC == null) return;
+
+        bool talk =
+            Keyboard.current.enterKey.wasPressedThisFrame ||
+            Keyboard.current.numpadEnterKey.wasPressedThisFrame ||
+            Mouse.current.leftButton.wasPressedThisFrame;
+
+        if (!talk) return;
+
+        string[] lines =
+            dialogueDatabase.GetDialogue(currentNPC.npcId);
+
+        OpenDialogue(currentNPC.npcId, lines);
     }
 }
