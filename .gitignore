@@ -109,3 +109,4 @@ InitTestScene*.unity*
 # Original
 PurchasedAssets
 Fonts
+Assets/Resources/*.txt

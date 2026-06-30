@@ -1,5 +1,7 @@
 public enum GameState
 {
     FreeMove,
-    InDialogue
+    InDialogue,
+    InChoice,
+    InTyping   // ★追加
 }

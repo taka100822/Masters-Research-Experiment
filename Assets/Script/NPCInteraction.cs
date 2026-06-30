@@ -6,7 +6,14 @@ public class NPCInteraction : MonoBehaviour
 
     private void Start()
     {
-        bubbleUI.SetActive(false);
+        if (bubbleUI != null)
+            bubbleUI.SetActive(false);
+    }
+
+    public void SetBubbleVisible(bool visible)
+    {
+        if (bubbleUI != null)
+            bubbleUI.SetActive(visible);
     }
 
     private void OnTriggerEnter(Collider other)
@@ -17,6 +24,8 @@ public class NPCInteraction : MonoBehaviour
 
             FindAnyObjectByType<DialogueManager>()
                 .SetCurrentNPC(GetComponent<NPCDialogue>());
+
+            Debug.Log("NPC SET");
         }
     }
 
@@ -25,6 +34,11 @@ public class NPCInteraction : MonoBehaviour
         if (other.CompareTag("Player"))
         {
             bubbleUI.SetActive(false);
+
+            FindAnyObjectByType<DialogueManager>()
+                .SetCurrentNPC(null);
+
+            Debug.Log("NPC CLEARED");
         }
     }
 }
