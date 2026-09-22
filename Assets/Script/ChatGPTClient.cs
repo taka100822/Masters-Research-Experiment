@@ -6,9 +6,14 @@ using UnityEngine.Networking;
 public class ChatGPTClient : MonoBehaviour
 {
     private string apiKey;
+
     [SerializeField] private PromptData promptData;
 
+    // OpenAI API
     private const string endpoint = "https://api.openai.com/v1/chat/completions";
+
+    // 使用するモデル
+    private const string model = "gpt-5.6-luna";
 
     [System.Serializable]
     public class ChatRequest
@@ -21,6 +26,25 @@ public class ChatGPTClient : MonoBehaviour
         {
             public string role;
             public string content;
+        }
+    }
+
+    [System.Serializable]
+    public class ChatResponse
+    {
+        public Choice[] choices;
+
+        [System.Serializable]
+        public class Choice
+        {
+            public Message message;
+
+            [System.Serializable]
+            public class Message
+            {
+                public string role;
+                public string content;
+            }
         }
     }
 
@@ -42,45 +66,60 @@ public class ChatGPTClient : MonoBehaviour
         apiKey = keyFile.text.Trim();
     }
 
-    public async Task<string> SendChatMessage(string userText, string systemPrompt)
+    public async Task<string> SendChatMessage(
+        string userText,
+        string systemPrompt)
     {
-        var json = BuildRequest(userText, systemPrompt);
+        string json = BuildRequest(userText, systemPrompt);
 
         using var request = new UnityWebRequest(endpoint, "POST");
+
         byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
 
         request.uploadHandler = new UploadHandlerRaw(bodyRaw);
         request.downloadHandler = new DownloadHandlerBuffer();
 
-        request.SetRequestHeader("Content-Type", "application/json");
-        request.SetRequestHeader("Authorization", "Bearer " + apiKey);
+        request.SetRequestHeader(
+            "Content-Type",
+            "application/json"
+        );
+
+        request.SetRequestHeader(
+            "Authorization",
+            "Bearer " + apiKey
+        );
 
         var operation = request.SendWebRequest();
 
         while (!operation.isDone)
+        {
             await Task.Yield();
+        }
 
         if (request.result != UnityWebRequest.Result.Success)
         {
-            Debug.LogError(request.error);
+            Debug.LogError(
+                $"OpenAI API Error: {request.responseCode}\n" +
+                $"{request.error}\n" +
+                $"{request.downloadHandler.text}"
+            );
+
             return "エラー";
         }
 
-        return ParseResponse(request.downloadHandler.text);
+        return ParseResponse(
+            request.downloadHandler.text
+        );
     }
 
-    private string ParseResponse(string json)
+    private string BuildRequest(
+        string userText,
+        string systemPrompt)
     {
-        int start = json.IndexOf("content") + 11;
-        int end = json.IndexOf("\"", start);
-        return json.Substring(start, end - start);
-    }
-
-    private string BuildRequest(string userText, string systemPrompt)
-    {
-        ChatRequest req = new ChatRequest
+        ChatRequest request = new ChatRequest
         {
-            model = "gpt-4o-mini",
+            model = model,
+
             messages = new ChatRequest.Message[]
             {
                 new ChatRequest.Message
@@ -88,6 +127,7 @@ public class ChatGPTClient : MonoBehaviour
                     role = "system",
                     content = systemPrompt
                 },
+
                 new ChatRequest.Message
                 {
                     role = "user",
@@ -96,6 +136,37 @@ public class ChatGPTClient : MonoBehaviour
             }
         };
 
-        return JsonUtility.ToJson(req);
+        return JsonUtility.ToJson(request);
+    }
+
+    private string ParseResponse(string json)
+    {
+        try
+        {
+            ChatResponse response =
+                JsonUtility.FromJson<ChatResponse>(json);
+
+            if (response == null ||
+                response.choices == null ||
+                response.choices.Length == 0 ||
+                response.choices[0].message == null)
+            {
+                Debug.LogError(
+                    "Invalid response from OpenAI API."
+                );
+
+                return "エラー";
+            }
+
+            return response.choices[0].message.content;
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError(
+                $"Failed to parse OpenAI response: {e}"
+            );
+
+            return "エラー";
+        }
     }
 }
