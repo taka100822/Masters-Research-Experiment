@@ -15,6 +15,9 @@ public class ChatGPTClient : MonoBehaviour
     // 使用するモデル
     private const string model = "gpt-5.6-luna";
 
+    // 実験ログに記録するため（README 6.3）
+    public static string ModelName => model;
+
     [System.Serializable]
     public class ChatRequest
     {

@@ -73,6 +73,7 @@ public class QuestManager : MonoBehaviour
 
         State = QuestState.InProgress;
         Debug.Log("[Quest] Start: " + Quest.title);
+        ExperimentLogger.Log("quest_start", detail: "quest_id=" + Quest.questId);
 
         OnChanged?.Invoke();
     }
@@ -92,6 +93,7 @@ public class QuestManager : MonoBehaviour
             return;
 
         Debug.Log("[Quest] Clue: " + clueId);
+        ExperimentLogger.Log("clue_get", clueId: clueId);
 
         OnChanged?.Invoke();
     }
@@ -113,6 +115,7 @@ public class QuestManager : MonoBehaviour
 
         State = QuestState.Completed;
         Debug.Log("[Quest] Complete: " + Quest.title);
+        ExperimentLogger.Log("quest_complete", detail: "quest_id=" + Quest.questId);
 
         OnChanged?.Invoke();
     }

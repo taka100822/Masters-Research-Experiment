@@ -84,6 +84,7 @@ public class SettingsPanelUI : MonoBehaviour
     private void OnClickTitle()
     {
         Debug.Log("[Settings] Back to title");
+        ExperimentLogger.EndSessionNow("back_to_title");
 
         Time.timeScale = 1f; // 設定パネル表示中は止めているので戻してから移る
         SceneManager.LoadScene(TitleSceneName);

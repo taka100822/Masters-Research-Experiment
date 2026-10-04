@@ -110,3 +110,5 @@ InitTestScene*.unity*
 PurchasedAssets
 Fonts
 Assets/Resources/*.txt
+# 実験ログ（README 6.2）
+ExperimentLogs/

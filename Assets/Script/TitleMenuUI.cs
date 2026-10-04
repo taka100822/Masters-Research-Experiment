@@ -20,6 +20,7 @@ public class TitleMenuUI : MonoBehaviour
     [SerializeField] private TMP_Dropdown questDropdown;       // 0: クエスト1, 1: クエスト2
     [SerializeField] private Button closeButton;
     [SerializeField] private TMP_Text errorText;
+    [SerializeField] private TMP_Text logPathText;   // ログの保存先（README 6.2）
 
     [Tooltip("モーダル表示中に隠すもの（タイトル文字・はじめるボタンが窓の後ろからはみ出して見えないように）")]
     [SerializeField] private GameObject[] hideWhileModalOpen;
@@ -54,6 +55,8 @@ public class TitleMenuUI : MonoBehaviour
         conditionDropdown.SetValueWithoutNotify(ExperimentConfig.Condition == DialogueCondition.B_ChoiceAndInput ? 1 : 0);
         questDropdown.SetValueWithoutNotify(ExperimentConfig.QuestNumber - 1);
         errorText.text = "";
+        if (logPathText != null)
+            logPathText.text = "ログ保存先：" + ExperimentLogger.LogDirectory;
 
         developerModal.SetActive(true);
         SetTitleContentVisible(false);

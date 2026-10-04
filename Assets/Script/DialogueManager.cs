@@ -202,8 +202,13 @@ public class DialogueManager : MonoBehaviour
 
         StopPlayer();
 
+        ExperimentLogger.Log("dialogue_start", npcId: CurrentNpcId, nodeId: id,
+            detail: "quest_state=" + (QuestManager.Instance != null ? QuestManager.Instance.State.ToString() : "none"));
+
         ShowNode();
     }
+
+    private string CurrentNpcId => currentNPC != null ? currentNPC.npcId : null;
 
     private void ShowNode()
     {
@@ -215,6 +220,8 @@ public class DialogueManager : MonoBehaviour
 
         dialogueText.text = currentNode.text;
         nameText.text = currentNPC != null ? currentNPC.DisplayName : "";
+
+        ExperimentLogger.Log("npc_line", npcId: CurrentNpcId, nodeId: currentNodeId, text: currentNode.text);
 
         ExecuteNodeAction(currentNode.action);
 
@@ -362,6 +369,10 @@ public class DialogueManager : MonoBehaviour
         if (ChoiceSubmitPressed())
         {
             choicePanel.SetActive(false);
+
+            ExperimentLogger.Log("choice_select", npcId: CurrentNpcId, nodeId: currentNodeId,
+                text: choices[choiceIndex].text, choiceIndex: choiceIndex);
+
             choices[choiceIndex].onSelect?.Invoke();
         }
     }
@@ -402,34 +413,54 @@ public class DialogueManager : MonoBehaviour
 
         inputPanel.SetActive(false);
 
-        PromptData prompt = LoadPromptData(currentNPC);
+        string npcId = CurrentNpcId;
+        int nodeId = currentNodeId;
+        ExperimentLogger.Log("free_input_submit", npcId: npcId, nodeId: nodeId, playerInput: text);
+
+        PromptData prompt = LoadPromptData(currentNPC, out string promptPath);
         if (prompt == null)
         {
             Debug.LogError("PromptData not found: " + currentNPC.npcId);
-            ShowAIResponse("……（今は話せないようだ）");
+            const string fallback = "……（今は話せないようだ）";
+            ExperimentLogger.Log("ai_response", npcId: npcId, nodeId: nodeId, text: fallback, isError: true, detail: "prompt=none");
+            ShowAIResponse(fallback);
             return;
         }
 
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         string reply = await chatGPT.SendChatMessage(
             text,
             prompt.systemPrompt
         );
+        stopwatch.Stop();
+
+        // ChatGPTClientは失敗時に「エラー」を返す（README 4.5）
+        ExperimentLogger.Log("ai_response", npcId: npcId, nodeId: nodeId, text: reply, isError: reply == "エラー",
+            detail: "prompt=" + promptPath + ";hash=" + ExperimentLogger.Hash8(prompt.systemPrompt) + ";latency_ms=" + stopwatch.ElapsedMilliseconds);
 
         ShowAIResponse(reply);
     }
 
     // PromptData/Q{クエスト番号}/ → PromptData/Common/ → NPCDialogue.promptData の順で探す（README 19.7.2）
-    private PromptData LoadPromptData(NPCDialogue npc)
+    // pathには見つかった場所（ログ用。例：Q1/NPC005）が入る
+    private PromptData LoadPromptData(NPCDialogue npc, out string path)
     {
         int questNumber = ExperimentSettings.Instance != null
             ? ExperimentSettings.Instance.questNumber
             : 1;
 
-        PromptData prompt = Resources.Load<PromptData>("PromptData/Q" + questNumber + "/" + npc.npcId);
+        path = "Q" + questNumber + "/" + npc.npcId;
+        PromptData prompt = Resources.Load<PromptData>("PromptData/" + path);
         if (prompt == null)
-            prompt = Resources.Load<PromptData>("PromptData/Common/" + npc.npcId);
+        {
+            path = "Common/" + npc.npcId;
+            prompt = Resources.Load<PromptData>("PromptData/" + path);
+        }
         if (prompt == null)
+        {
+            path = "NPCDialogue/" + npc.npcId;
             prompt = npc.promptData;
+        }
 
         return prompt;
     }
@@ -452,6 +483,8 @@ public class DialogueManager : MonoBehaviour
 
     public void CloseDialogue()
     {
+        ExperimentLogger.Log("dialogue_end", npcId: CurrentNpcId);
+
         currentState = GameState.FreeMove;
 
         dialoguePanel.SetActive(false);
@@ -482,6 +515,8 @@ public class DialogueManager : MonoBehaviour
 
         if (questCompletePanel != null)
             questCompletePanel.SetActive(true);
+
+        ExperimentLogger.EndSessionNow("quest_complete");
     }
 
     // プレイヤーを止める。enabled=falseだけだと走りモーションと足音が続くため、速度も0にする
@@ -517,6 +552,8 @@ public class DialogueManager : MonoBehaviour
 
         Time.timeScale = 0f;
         settingsPanel.Open();
+
+        ExperimentLogger.Log("settings_open");
     }
 
     private void HandleSettingsInput()
@@ -529,6 +566,8 @@ public class DialogueManager : MonoBehaviour
 
     private void CloseSettings()
     {
+        ExperimentLogger.Log("settings_close");
+
         settingsPanel.Close();
         Time.timeScale = 1f;
 
@@ -543,6 +582,9 @@ public class DialogueManager : MonoBehaviour
     {
         var player = playerController.transform;
         Vector3 delta = playerStartPosition - player.position;
+
+        ExperimentLogger.Log("respawn", detail: string.Format(System.Globalization.CultureInfo.InvariantCulture,
+            "from_x={0:0.00};from_z={1:0.00}", player.position.x, player.position.z));
 
         var cc = playerController.GetComponent<CharacterController>();
         cc.enabled = false;
