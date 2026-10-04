@@ -15,6 +15,7 @@ public class DialogueManager : MonoBehaviour
     [SerializeField] private GameObject choicePanel;
     [SerializeField] private GameObject inputPanel;
     [SerializeField] private TMP_InputField inputField;
+    [SerializeField] private GameObject questCompletePanel;
 
     [Header("Text")]
     [SerializeField] private TMP_Text nameText;
@@ -49,6 +50,9 @@ public class DialogueManager : MonoBehaviour
         nextIndicator.SetActive(false);
         choicePanel.SetActive(false);
         inputPanel.SetActive(false);
+
+        if (questCompletePanel != null)
+            questCompletePanel.SetActive(false);
 
         dialogueDatabase = FindAnyObjectByType<DialogueDatabase>();
         chatGPT = GameManager.Instance.GetComponent<ChatGPTClient>();
@@ -110,9 +114,56 @@ public class DialogueManager : MonoBehaviour
         if (!TalkPressed() || currentNPC == null)
             return;
 
-        dialogueDatabase.LoadCSV("Dialogue/" + currentNPC.csvFileName);
+        if (!LoadDialogueCSV(currentNPC.csvFileName))
+        {
+            Debug.LogError("Dialogue CSV not found: " + currentNPC.csvFileName);
+            return;
+        }
 
-        StartNode(0);
+        StartNode(SelectStartNode());
+    }
+
+    // Dialogue/Q{クエスト番号}/ → Dialogue/Common/ → Dialogue/ の順で探す（README 19.6.3）
+    private bool LoadDialogueCSV(string csvFileName)
+    {
+        int questNumber = ExperimentSettings.Instance != null
+            ? ExperimentSettings.Instance.questNumber
+            : 1;
+
+        return dialogueDatabase.LoadCSV("Dialogue/Q" + questNumber + "/" + csvFileName)
+            || dialogueDatabase.LoadCSV("Dialogue/Common/" + csvFileName)
+            || dialogueDatabase.LoadCSV("Dialogue/" + csvFileName);
+    }
+
+    // クエスト状態ごとの開始ノード。無ければ後ろの候補へ（README 19.6.4）
+    private int SelectStartNode()
+    {
+        int[] candidates = new[] { 0 };
+
+        var quest = QuestManager.Instance;
+        if (quest != null)
+        {
+            switch (quest.State)
+            {
+                case QuestState.InProgress:
+                    candidates = quest.HasAllClues()
+                        ? new[] { 200, 100, 0 }
+                        : new[] { 100, 0 };
+                    break;
+
+                case QuestState.Completed:
+                    candidates = new[] { 300, 0 };
+                    break;
+            }
+        }
+
+        foreach (int id in candidates)
+        {
+            if (dialogueDatabase.HasNode(id))
+                return id;
+        }
+
+        return 0;
     }
 
     private void StartNode(int id)
@@ -139,7 +190,9 @@ public class DialogueManager : MonoBehaviour
         }
 
         dialogueText.text = currentNode.text;
-        nameText.text = currentNPC != null ? currentNPC.npcId : "";
+        nameText.text = currentNPC != null ? currentNPC.DisplayName : "";
+
+        ExecuteNodeAction(currentNode.action);
 
         ShowChoicesFromNode();
     }
@@ -166,7 +219,10 @@ public class DialogueManager : MonoBehaviour
             });
         }
 
-        if (currentNode.allowInput == 1)
+        // 自由入力は条件Bのときのみ（条件はクエスト・NPCに依存しない全体設定）
+        if (currentNode.allowInput == 1 &&
+            ExperimentSettings.Instance != null &&
+            ExperimentSettings.Instance.AllowFreeInput)
         {
             list.Add(new Choice
             {
@@ -182,6 +238,8 @@ public class DialogueManager : MonoBehaviour
         }
         else
         {
+            // 選択肢から遷移してきた場合もInChoiceのままにしない（前の選択肢が再実行されるのを防ぐ）
+            currentState = GameState.InDialogue;
             nextIndicator.SetActive(true);
         }
     }
@@ -209,6 +267,23 @@ public class DialogueManager : MonoBehaviour
         currentNode = dialogueDatabase.GetNode(id);
 
         ShowNode();
+    }
+
+    // CSVのaction列をクエストに反映する（README 19.6.3）
+    private void ExecuteNodeAction(string action)
+    {
+        var quest = QuestManager.Instance;
+        if (string.IsNullOrEmpty(action) || quest == null)
+            return;
+
+        if (action == "startQuest")
+            quest.StartQuest();
+        else if (action.StartsWith("clue:"))
+            quest.AddClue(action.Substring("clue:".Length));
+        else if (action == "complete")
+            quest.Complete();
+        else
+            Debug.LogWarning("Unknown node action: " + action);
     }
 
     // =========================
@@ -303,12 +378,36 @@ public class DialogueManager : MonoBehaviour
 
         inputPanel.SetActive(false);
 
+        PromptData prompt = LoadPromptData(currentNPC);
+        if (prompt == null)
+        {
+            Debug.LogError("PromptData not found: " + currentNPC.npcId);
+            ShowAIResponse("……（今は話せないようだ）");
+            return;
+        }
+
         string reply = await chatGPT.SendChatMessage(
             text,
-            currentNPC.promptData.systemPrompt
+            prompt.systemPrompt
         );
 
         ShowAIResponse(reply);
+    }
+
+    // PromptData/Q{クエスト番号}/ → PromptData/Common/ → NPCDialogue.promptData の順で探す（README 19.7.2）
+    private PromptData LoadPromptData(NPCDialogue npc)
+    {
+        int questNumber = ExperimentSettings.Instance != null
+            ? ExperimentSettings.Instance.questNumber
+            : 1;
+
+        PromptData prompt = Resources.Load<PromptData>("PromptData/Q" + questNumber + "/" + npc.npcId);
+        if (prompt == null)
+            prompt = Resources.Load<PromptData>("PromptData/Common/" + npc.npcId);
+        if (prompt == null)
+            prompt = npc.promptData;
+
+        return prompt;
     }
 
     private void ShowAIResponse(string reply)
@@ -346,6 +445,24 @@ public class DialogueManager : MonoBehaviour
         }
 
         playerController.enabled = true;
+
+        // 達成会話を閉じたら終了画面へ（README 19.6.7）
+        if (QuestManager.Instance != null &&
+            QuestManager.Instance.State == QuestState.Completed)
+        {
+            EndGame();
+        }
+    }
+
+    private void EndGame()
+    {
+        currentState = GameState.Ended;
+
+        talkHint.SetActive(false);
+        playerController.enabled = false;
+
+        if (questCompletePanel != null)
+            questCompletePanel.SetActive(true);
     }
 
     public void SetCurrentNPC(NPCDialogue npc)

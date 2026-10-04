@@ -18,6 +18,9 @@ public class DialogueDatabase : MonoBehaviour
         public int choiceB_next;
 
         public int allowInput;
+
+        // startQuest / clue:<clueId> / complete / 空（README 19.6.3）
+        public string action;
     }
 
     private Dictionary<int, Node> nodes = new();
@@ -29,11 +32,14 @@ public class DialogueDatabase : MonoBehaviour
         Debug.Log("Node Count = " + nodes.Count);
     }
 
-    public void LoadCSV(string path)
+    public bool LoadCSV(string path)
     {
-        nodes.Clear();
-        
         TextAsset csv = Resources.Load<TextAsset>(path);
+
+        if (csv == null)
+            return false;
+
+        nodes.Clear();
 
         string[] lines = csv.text.Split('\n');
 
@@ -76,10 +82,19 @@ public class DialogueDatabase : MonoBehaviour
                 allowInput =
                     (values.Length > 7 && int.TryParse(values[7].Trim(), out int ai))
                     ? ai
-                    : 0
+                    : 0,
+
+                action = values.Length > 8 ? values[8].Trim() : ""
             };
             nodes[node.id] = node;
         }
+
+        return true;
+    }
+
+    public bool HasNode(int id)
+    {
+        return nodes.ContainsKey(id);
     }
 
     public Node GetNode(int id)

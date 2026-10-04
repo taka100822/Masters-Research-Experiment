@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 14bf48bc6da2d334cb7a15e8c4c17b8b, type: 3}
+  m_Name: Q1
+  m_EditorClassIdentifier: Assembly-CSharp::QuestData
+  questId: 1
+  title: "\u6D88\u3048\u305F\u85AC\u8349"
+  clues:
+  - clueId: place
+    category: "\u5834\u6240"
+    text: "\u6751\u306E\u5165\u308A\u53E3"
+  - clueId: time
+    category: "\u6642\u9593"
+    text: "\u6628\u65E5\u306E\u5915\u65B9"
+  - clueId: person
+    category: "\u4EBA\u7269"
+    text: "\u65C5\u306E\u884C\u5546\u4EBA"
+  - clueId: feature
+    category: "\u7279\u5FB4"
+    text: "\u8D64\u3044\u5E03\u306B\u5305\u307E\u308C\u305F\u675F"
