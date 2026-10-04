@@ -1,11 +1,14 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.SceneManagement;
 
 // 設定パネルの表示とスライダー・ボタンの処理（README 13章 設定パネル）
 // 開閉のタイミング（Qキー・状態遷移）はDialogueManagerが管理する
 public class SettingsPanelUI : MonoBehaviour
 {
+    public const string TitleSceneName = "TitleScene";
+
     [SerializeField] private GameObject settingsPanel;
     [SerializeField] private Slider bgmSlider;
     [SerializeField] private Slider seSlider;
@@ -77,10 +80,13 @@ public class SettingsPanelUI : MonoBehaviour
         sensitivityValueText.text = sensitivitySlider.value.ToString("0.0");
     }
 
+    // タイトルへ戻る。クエストの進み具合はリセットされる（MainSceneを読み直すため）
     private void OnClickTitle()
     {
-        // タイトル画面はまだ無い
-        Debug.Log("[Settings] タイトルへ戻る（未実装）");
+        Debug.Log("[Settings] Back to title");
+
+        Time.timeScale = 1f; // 設定パネル表示中は止めているので戻してから移る
+        SceneManager.LoadScene(TitleSceneName);
     }
 
     private void OnClickRespawn()

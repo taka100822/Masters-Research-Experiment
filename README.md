@@ -18,7 +18,7 @@
 | GameManager | ゲーム全体の状態管理を担う | **`GameState`プロパティと`SetState`/`IsFree`は実装されているが実際には未使用（呼び出し元なし）。会話状態は`DialogueManager`が独自の`private currentState`で管理しており、GameManager経由ではない** |
 | クエストシステム | 詳細仕様あり（19章） | **実装済み**（`QuestData`／`QuestManager`／`QuestPanelUI`、CSVの`action`列。19.6〜19.8） |
 | 実験ログ（会話ログ・行動ログ・CSV出力） | 詳細仕様あり（17〜18章） | **未実装**（ログ関連スクリプトなし） |
-| AI条件／非AI条件の切り替え | 仕組みとして想定（20章） | **実装済み**：`ExperimentSettings`（参加者ID・条件A/B・クエスト番号）をInspectorで設定。「入力する」は`allowInput=1`のノードかつ条件Bのときだけ出る |
+| AI条件／非AI条件の切り替え | 仕組みとして想定（20章） | **実装済み**：タイトル画面の開発者用モーダルで参加者ID・条件A/B・クエスト番号を設定（MainSceneを直接Playするときは`ExperimentSettings`のInspector）。「入力する」は`allowInput=1`のノードかつ条件Bのときだけ出る |
 | TalkHint | 単一のUI要素として想定 | **2系統存在**：①`NPCInteraction`がNPCごとに持つワールドスペース吹き出し（`bubbleUI`、`Billboard.cs`で常にカメラを向く）、②`DialogueManager`が管理するグローバルUIの`talkHint` |
 | NPC数 | 5〜10人程度を想定 | **6体（NPC001〜NPC006、19.6.5）** |
 
@@ -465,6 +465,59 @@ NPC名（`npcId`）と会話内容を表示する。
 
 NPCに近づいた際に表示する2系統のヒントUI。
 
+## タイトル画面（2026-10-05 承認・実装済み）
+
+ゲームを起動すると最初に出る画面。シーン`Assets/TitleScene.unity`をビルド設定の先頭（0番）に置く（MainSceneは1番）。
+
+```text
+┌──────────────────────────────────────┐
+│                                      │
+│            研究用ゲーム                │
+│                                      │
+│           [  はじめる  ]              │
+│                                      │
+│                                      │
+│ 参加者 P000 ／ 条件A ／ クエスト1       │  ← 現在の実験設定（実験者の確認用）
+│                         [開発者用]    │  ← 右下に小さく
+└──────────────────────────────────────┘
+```
+
+* **はじめる**：MainSceneへ移る
+* **開発者用**：開発者用モーダル（画面中央の小ウィンドウ）を開く。実験者がプレイ前に`ExperimentSettings`の内容をここで設定する
+
+**開発者用モーダル**
+
+```text
+┌────────────────────────────┐
+│ 開発者用設定                  │
+│ 参加者ID   [ P000        ]   │  ← 入力欄
+│ 対話条件   [ A ▼]             │  ← A／B
+│ クエスト   [ 1 ▼]             │  ← 1／2
+│                            │
+│      [ 閉じる ]              │
+└────────────────────────────┘
+```
+
+* プルダウンの選択肢は短い表記（「A」「B」「1」「2」）にしてあり、窓（560×500）・入力欄（260px）・プルダウン（120px）もそれに合わせた大きさにしている
+* モーダルを開いている間は、タイトル文字と「はじめる」ボタンを隠す（`TitleMenuUI.hideWhileModalOpen`。窓の後ろからはみ出して見えないように）
+* 「閉じる」を押したときに値を反映し、タイトルの設定表示も更新する。参加者IDが空のときは閉じられない（「参加者IDを入力してください」と表示）
+* タイトル画面ではカーソルを表示する。逆にMainSceneでは`DialogueManager.Start()`でカーソルを固定する（Starter Assetsのカーソル固定はウィンドウにフォーカスが入った瞬間しか働かず、タイトルから移ってきたときは固定されないため）
+* 背景は村の全景の静止画をぼかしたもの（`Assets/Texture/title_background_blur.png`。MainSceneをエディタ上で撮影した`title_background.png`にガウスぼかし半径12pxをかけた）。UIを読みやすくするため、上に黒25%の暗幕（`Dim`）を重ね、タイトルと設定表示の文字には濃い縁取り＋影のマテリアル（`Assets/Fonts/NotoSansJP-Regular SDF - TitleOutline.mat`、NPCの名前用とは別）を使う
+
+**設定の受け渡し**
+
+* `ExperimentSettings`はMainSceneの中にあるので、タイトルで入れた値は新しい`ExperimentConfig`（staticなデータ置き場。シーンが変わっても残る）に置く
+* MainSceneの`ExperimentSettings`は起動時（`Awake`）に、`ExperimentConfig`に値が入っていればそれで自分を上書きする。入っていなければ（＝エディタでMainSceneを直接Playしたとき）今までどおりInspectorの値を使う
+* `ExperimentConfig`もファイルには保存しない。アプリを起動し直すと初期値（P000／条件A／クエスト1）に戻る
+
+**追加するもの**
+
+* シーン：`Assets/TitleScene.unity`（Canvas・EventSystem・カメラ）
+* スクリプト：`ExperimentConfig`（staticな設定置き場）、`TitleMenuUI`（ボタンとモーダルの処理）
+* 変更：`ExperimentSettings.Awake()`で`ExperimentConfig`を読む（読んだ値はConsoleに`[Experiment] participant=… condition=… quest=…`と出る）
+* ビルド設定：0番`Assets/TitleScene.unity`、1番`Assets/MainScene.unity`
+* 設定パネルの「タイトルへ戻る」でTitleSceneへ戻る。MainSceneは読み直しになるので、クエストの進み具合はリセットされる（実験者が参加者を入れ替えるとき用）
+
 ## ミニマップ（2026-10-05 承認・実装済み）
 
 画面右上にプレイヤー中心のミニマップを常に表示し、自分の位置・向きと周りのNPCの位置を示す。今のクエストの依頼人は黄色（19.6.8の`clientColor`と同じ色）のアイコンにする。
@@ -508,7 +561,7 @@ NPCに近づいた際に表示する2系統のヒントUI。
 
 ## 設定パネル（2026-10-05 承認・実装済み）
 
-探索中に`Q`キーで開く設定パネル。上から **BGM音量・SE音量・視点感度のスライダー、「タイトルへ戻る」ボタン、「初期位置に戻る」ボタン** を並べる（2026-10-05に感度と初期位置を追加・並び替え。承認・実装済み）。「タイトルへ戻る」はタイトル画面がまだ無いので、押しても今は何も起きない（Consoleにログだけ出す）。
+探索中に`Q`キーで開く設定パネル。上から **BGM音量・SE音量・視点感度のスライダー、「タイトルへ戻る」ボタン、「初期位置に戻る」ボタン** を並べる（2026-10-05に感度と初期位置を追加・並び替え。承認・実装済み）。「タイトルへ戻る」はタイトル画面（`TitleScene`）へ戻る（クエストの進み具合はリセット）。
 
 **画面**
 
@@ -640,6 +693,12 @@ SettingsPanelUI（13章 設定パネルで追加）
 
 MinimapUI（13章 ミニマップで追加）
     └ プレイヤー中心のミニマップ（地図のスクロールとアイコン配置）
+
+ExperimentConfig（static、13章 タイトル画面で追加）
+    └ タイトル画面で設定した実験設定をMainSceneへ渡す
+
+TitleMenuUI（TitleScene、13章 タイトル画面で追加）
+    └ はじめる／開発者用ボタンと開発者用モーダル
 ```
 
 `DialogueDatabase`／`ChatGPTClient`／`PromptData`／`NPCDialogue`／`NPCInteraction`は元仕様書の想定とおおむね一致。`GameManager`は責務が縮小されており、`Billboard`が新たに追加されている。

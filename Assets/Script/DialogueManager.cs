@@ -54,6 +54,10 @@ public class DialogueManager : MonoBehaviour
         playerStartPosition = playerController.transform.position;
         playerStartRotation = playerController.transform.rotation;
 
+        // タイトル画面から来た場合、Starter Assetsのカーソル固定（フォーカス時のみ）が働かないのでここで固定する
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
         dialoguePanel.SetActive(false);
         talkHint.SetActive(false);
         nextIndicator.SetActive(false);

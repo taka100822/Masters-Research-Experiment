@@ -32,6 +32,17 @@ public class ExperimentSettings : MonoBehaviour
         else
         {
             Destroy(this);
+            return;
         }
+
+        // タイトル画面から来た場合はそこで設定した値を使う（直接MainSceneをPlayしたときはInspectorの値のまま）
+        if (ExperimentConfig.HasValue)
+        {
+            participantId = ExperimentConfig.ParticipantId;
+            condition = ExperimentConfig.Condition;
+            questNumber = ExperimentConfig.QuestNumber;
+        }
+
+        UnityEngine.Debug.Log("[Experiment] participant=" + participantId + " condition=" + condition + " quest=" + questNumber);
     }
 }
