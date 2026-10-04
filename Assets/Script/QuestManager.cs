@@ -15,7 +15,18 @@ public class QuestManager : MonoBehaviour
 {
     public static QuestManager Instance;
 
-    public QuestData Quest { get; private set; }
+    // 最初に参照されたときに読み込む（他コンポーネントのStartから参照されても読めるように）
+    public QuestData Quest
+    {
+        get
+        {
+            if (quest == null)
+                LoadQuest();
+            return quest;
+        }
+    }
+
+    private QuestData quest;
     public QuestState State { get; private set; } = QuestState.NotStarted;
 
     public event Action OnChanged;
@@ -36,14 +47,22 @@ public class QuestManager : MonoBehaviour
 
     private void Start()
     {
-        // ExperimentSettingsのAwake後に読むためStartで行う
+        LoadQuest();
+    }
+
+    // ExperimentSettingsのAwake後に呼ばれる必要がある（Start以降ならよい）
+    private void LoadQuest()
+    {
+        if (quest != null)
+            return;
+
         int questNumber = ExperimentSettings.Instance != null
             ? ExperimentSettings.Instance.questNumber
             : 1;
 
-        Quest = Resources.Load<QuestData>("Quest/Q" + questNumber);
+        quest = Resources.Load<QuestData>("Quest/Q" + questNumber);
 
-        if (Quest == null)
+        if (quest == null)
             Debug.LogError("QuestData not found: Quest/Q" + questNumber);
     }
 

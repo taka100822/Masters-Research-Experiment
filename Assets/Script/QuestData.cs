@@ -20,6 +20,10 @@ public class QuestData : ScriptableObject
 
     public int questId;
     public string title;
+
+    [Tooltip("依頼人のnpcId（吹き出しの色分けに使う。README 19.6.8）")]
+    public string clientNpcId;
+
     public List<Clue> clues = new();
 
     public Clue GetClue(string clueId)

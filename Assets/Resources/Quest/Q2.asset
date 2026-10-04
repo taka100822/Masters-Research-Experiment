@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::QuestData
   questId: 2
   title: "\u796D\u308A\u306E\u9053\u5177\u63A2\u3057"
+  clientNpcId: NPC004
   clues:
   - clueId: place
     category: "\u5834\u6240"
