@@ -120,6 +120,12 @@ Starter Assets Third Person Character Controller（購入アセット）をそ�
 
 （Starter Assetsの標準入力。`ThirdPersonController`＋`StarterAssetsInputs`を使用）
 
+見た目のモデルは購入アセットの`Axe_Warrior`を`PlayerArmature`の子として使っている。
+
+> **2026-10-05修正**：`Axe_Warrior`が`PlayerArmature`の原点から横に0.3mずれて置かれていたため、方向転換のときにその場で回らず片足（左足）を軸に回っているように見えていた（当たり判定のカプセルも見た目と0.3mずれていた）。`Axe_Warrior`のlocalPositionのxを0にして、モデルの中心を回転の中心に合わせた（高さy=0.029は接地のためそのまま）。
+
+> **2026-10-05修正（カメラ）**：上の修正後、キャラクターが画面中央から右にずれて見えるようになった。カメラ（`PlayerFollowCamera`の`Cinemachine3rdPersonFollow`）が肩越し用に`ShoulderOffset.x=1`・`CameraSide=0.6`（＝右に0.2m）になっており、これまではモデルの0.3mのずれとほぼ打ち消し合っていたため。`CameraSide`を0.5（左右のずれ0）にして、キャラクターが画面の中央に来るようにした。
+
 ### NPCへのインタラクション
 
 **実装上は `E` キーではなく `Enter` キーを使用する。**
@@ -157,7 +163,9 @@ NPCごとに `NPCDialogue` のInspector値・CSV・PromptDataアセットを差�
 
 ## 6.1 対話UI
 
-会話中はプレイヤーの移動・カメラ操作を停止する（`playerController.enabled = false`）。
+会話中はプレイヤーの移動・カメラ操作を停止する（`DialogueManager.StopPlayer()`）。
+
+> **2026-10-05修正**：以前は`playerController.enabled = false`だけで止めていたため、走りながら話しかけるとアニメーターの`Speed`が走行中の値のまま残り、走りモーションと足音（アニメーションイベント`OnFootstep`は無効化したスクリプトでも呼ばれる）が会話中ずっと続いていた。`ThirdPersonController`に`StopMotion()`（内部の速度・アニメーションの`Speed`を0にする）を追加し、会話・選択肢・自由入力・設定パネル・終了画面でプレイヤーを止めるときはすべて`StopPlayer()`経由で呼ぶようにした。`ThirdPersonController.cs`は購入アセット（Starter Assets）だが、このプロジェクトでは足音まわりなどに手が入っており、`StopMotion()`もその一つ。**注意：`Assets/PurchasedAssets/`は`.gitignore`で除外されているため、この変更はGitHubに含まれない。別のPCで開くときは、`ThirdPersonController.cs`に`StopMotion()`を同じように追加しないとコンパイルエラーになる。**
 
 画面下部または画面中央付近に会話ウィンドウ（`dialoguePanel`）を表示する。
 
@@ -351,7 +359,8 @@ public enum GameState
     InDialogue,
     InChoice,
     InTyping,
-    Ended      // クエスト達成後の終了画面（2026-10-04追加）
+    Ended,     // クエスト達成後の終了画面（2026-10-04追加）
+    InSettings // 設定パネル表示中・時間停止（2026-10-05追加）
 }
 ```
 
@@ -425,8 +434,13 @@ Canvas
 │   ├── TitleText
 │   └── ClueText1〜4
 │
-└── QuestCompletePanel      ※ 達成時の終了画面（DialogueManagerが表示）
-    └── CompleteText
+├── QuestCompletePanel      ※ 達成時の終了画面（DialogueManagerが表示）
+│   └── CompleteText
+│
+└── SettingsPanel           ※ Qキーで開く設定パネル（SettingsPanelUIが管理）
+    ├── HeaderText / TitleButton
+    ├── BGMRow / SERow（Label・Slider・Value）
+    └── HintText
 ```
 
 これとは別に、**NPCごとに`NPCInteraction`がワールドスペースの吹き出しUI（`bubbleUI`）を持つ**。プレイヤーがトリガーに入ると表示され、`Billboard.cs`によって常にカメラの方を向く。DialogueManager側の`talkHint`とは別物で、両方が同時に存在しうる。
@@ -446,6 +460,57 @@ NPC名（`npcId`）と会話内容を表示する。
 ## TalkHint / NPC吹き出し
 
 NPCに近づいた際に表示する2系統のヒントUI。
+
+## 設定パネル（2026-10-05 承認・実装済み）
+
+探索中に`Q`キーで開く設定パネル。BGM・SEの音量をスライダーで調整でき、「タイトルへ戻る」ボタンを置く（タイトル画面がまだ無いので、押しても今は何も起きない。Consoleにログだけ出す）。
+
+**画面**
+
+```text
+┌────────────────────────────┐
+│ 設定                        │
+│      [ タイトルへ戻る ]      │
+│                            │
+│ BGM  ━━━━━━━●━━━  80%       │
+│ SE   ━━━━━━━●━━━  80%       │
+│                            │
+│        Q：閉じる            │
+└────────────────────────────┘
+```
+
+* 見た目は会話ウィンドウと同じ枠画像（`panel_rect_black-silver_03_128`）・NotoSansJP。画面中央に表示
+* スライダーはマウスで操作する（開いている間はカーソルを表示し、プレイヤーの移動・カメラ操作を止める）
+
+**開閉のルール**
+
+* 開けるのは探索中（`FreeMove`）だけ。会話中・選択肢中・自由入力中・終了画面では`Q`を押しても開かない（自由入力の文章に「q」を打ったときに開いてしまうのを防ぐため）
+* 閉じるのは`Q`のみ（`Esc`は使わない）。閉じるとプレイヤー操作が戻る
+* `GameState`に`InSettings`を追加し、`DialogueManager`が他の状態と同じように管理する（開いている間は`Enter`で話しかけない）
+* 開いている間はゲーム内の時間を止める（`Time.timeScale = 0`）。NPCの待機モーションなども止まる。閉じると元に戻す
+* 音は止めない（BGM・SEを鳴らしたままにして、スライダーを動かしながら音量を確かめられるようにする）
+* 開いていた時間はプレイ時間に含めない。Phase 8のログでは開閉時刻を記録し、時間を計るときは`Time.time`（止めている間は進まない）を使う想定
+
+**音量の仕組み**
+
+AudioMixerは使わず、音量を1か所で持って各音源（`AudioSource`）に掛ける。SEはプレイヤーの足音・着地音だけで、`Player/PlayerArmature/Audio/`の`Footstep_Concrete`・`Footstep_Land`（`ThirdPersonController`から`Play()`される`AudioSource`）で鳴っている。
+
+* `AudioVolumeSettings`（新規、`GameManager`に付ける）：BGM音量・SE音量（0〜1）を保持し、変わったら通知する
+* `VolumeChannel`（新規）：BGMやSEを鳴らす`AudioSource`に付け、「BGM」か「SE」かを指定する。元の音量×設定音量を自動で反映する。今はBGMが無いので、BGMを追加するときにこれを付ける
+* 足音・着地音：`Footstep_Concrete`・`Footstep_Land`に`VolumeChannel`（SE）を付ける（`Robot`は音が設定されていない空の`AudioSource`なので対象外）
+* 初期値はBGM・SEとも80%。**設定は保存せず、起動するたびに初期値に戻す**（前の参加者が変えた音量が次の参加者に引き継がれると、参加者間で条件がそろわなくなるため）
+
+**実装したもの**
+
+* スクリプト：`AudioVolumeSettings`・`VolumeChannel`・`SettingsPanelUI`（表示とスライダー・ボタンの処理。開閉の判定は`DialogueManager.OpenSettings()`／`CloseSettings()`）
+* シーン：`Canvas/SettingsPanel`（`HeaderText`・`TitleButton`・`BGMRow`・`SERow`・`HintText`）、`SettingsPanelUI`は`Canvas`に、`AudioVolumeSettings`は`GameManager`に、`VolumeChannel`（SE）は`Footstep_Concrete`・`Footstep_Land`に付けた
+
+**BGM（2026-10-05追加）**
+
+* 音源：`Assets/Audio/BGM.wav`（約82秒・ステレオ）。インポート設定は読み込み方式「Streaming」・圧縮Vorbis（品質70%）にした（長い曲を最初に全部メモリへ展開しないため）
+* シーンのルートに`BGM`オブジェクトを置き、`AudioSource`（ループ再生・起動時に自動再生・2D）と`VolumeChannel`（BGM）を付けた。設定パネルのBGMスライダーで音量が変わる
+* 設定パネルで時間を止めている間も、終了画面でもBGMは鳴り続ける
+
 
 ---
 
@@ -506,6 +571,12 @@ QuestManager（19.6で追加）
 
 QuestPanelUI（19.6で追加）
     └ 右上のクエストチェックリスト表示
+
+AudioVolumeSettings / VolumeChannel（13章 設定パネルで追加）
+    └ BGM・SE音量の保持と、各AudioSourceへの反映
+
+SettingsPanelUI（13章 設定パネルで追加）
+    └ 設定パネルのスライダー・ボタン処理
 ```
 
 `DialogueDatabase`／`ChatGPTClient`／`PromptData`／`NPCDialogue`／`NPCInteraction`は元仕様書の想定とおおむね一致。`GameManager`は責務が縮小されており、`Billboard`が新たに追加されている。

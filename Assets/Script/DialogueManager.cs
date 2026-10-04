@@ -16,6 +16,7 @@ public class DialogueManager : MonoBehaviour
     [SerializeField] private GameObject inputPanel;
     [SerializeField] private TMP_InputField inputField;
     [SerializeField] private GameObject questCompletePanel;
+    [SerializeField] private SettingsPanelUI settingsPanel;
 
     [Header("Text")]
     [SerializeField] private TMP_Text nameText;
@@ -77,6 +78,10 @@ public class DialogueManager : MonoBehaviour
             case GameState.InTyping:
                 HandleTypingInput();
                 break;
+
+            case GameState.InSettings:
+                HandleSettingsInput();
+                break;
         }
     }
 
@@ -109,6 +114,13 @@ public class DialogueManager : MonoBehaviour
 
     private void HandleFreeMoveInput()
     {
+        // 設定パネルは探索中だけ開ける（自由入力中の「q」で開かないように）
+        if (Keyboard.current.qKey.wasPressedThisFrame && settingsPanel != null)
+        {
+            OpenSettings();
+            return;
+        }
+
         talkHint.SetActive(currentNPC != null);
 
         if (!TalkPressed() || currentNPC == null)
@@ -176,7 +188,7 @@ public class DialogueManager : MonoBehaviour
         dialoguePanel.SetActive(true);
         talkHint.SetActive(false);
 
-        playerController.enabled = false;
+        StopPlayer();
 
         ShowNode();
     }
@@ -300,7 +312,7 @@ public class DialogueManager : MonoBehaviour
         choicePanel.SetActive(true);
         UpdateChoiceUI();
 
-        playerController.enabled = false;
+        StopPlayer();
     }
 
     private void UpdateChoiceUI()
@@ -437,12 +449,7 @@ public class DialogueManager : MonoBehaviour
 
         SetTypingMode(false);
 
-        if (inputs != null)
-        {
-            inputs.jump = false;
-            inputs.move = Vector2.zero;
-            inputs.look = Vector2.zero;
-        }
+        ResetPlayerInputs();
 
         playerController.enabled = true;
 
@@ -459,10 +466,64 @@ public class DialogueManager : MonoBehaviour
         currentState = GameState.Ended;
 
         talkHint.SetActive(false);
-        playerController.enabled = false;
+        StopPlayer();
 
         if (questCompletePanel != null)
             questCompletePanel.SetActive(true);
+    }
+
+    // プレイヤーを止める。enabled=falseだけだと走りモーションと足音が続くため、速度も0にする
+    private void StopPlayer()
+    {
+        if (playerController.enabled)
+            playerController.StopMotion();
+
+        playerController.enabled = false;
+    }
+
+    // 会話中・設定中に押されていた入力が、操作復帰後に残らないようにする
+    private void ResetPlayerInputs()
+    {
+        if (inputs != null)
+        {
+            inputs.jump = false;
+            inputs.move = Vector2.zero;
+            inputs.look = Vector2.zero;
+        }
+    }
+
+    // =========================
+    // Settings（README 13章 設定パネル）
+    // =========================
+
+    private void OpenSettings()
+    {
+        currentState = GameState.InSettings;
+
+        talkHint.SetActive(false);
+        SetTypingMode(true); // 移動停止・カーソル表示
+
+        Time.timeScale = 0f;
+        settingsPanel.Open();
+    }
+
+    private void HandleSettingsInput()
+    {
+        if (Keyboard.current.qKey.wasPressedThisFrame)
+        {
+            CloseSettings();
+        }
+    }
+
+    private void CloseSettings()
+    {
+        settingsPanel.Close();
+        Time.timeScale = 1f;
+
+        ResetPlayerInputs();
+        SetTypingMode(false); // 移動再開・カーソル非表示
+
+        currentState = GameState.FreeMove;
     }
 
     public void SetCurrentNPC(NPCDialogue npc)
@@ -473,7 +534,10 @@ public class DialogueManager : MonoBehaviour
     private void SetTypingMode(bool active)
     {
         // プレイヤー操作制御
-        playerController.enabled = !active;
+        if (active)
+            StopPlayer();
+        else
+            playerController.enabled = true;
 
         if (active)
         {
