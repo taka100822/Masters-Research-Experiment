@@ -5,6 +5,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.EventSystems;
 using TMPro;
 using StarterAssets;
+using Unity.Cinemachine;
 
 public class DialogueManager : MonoBehaviour
 {
@@ -42,9 +43,16 @@ public class DialogueManager : MonoBehaviour
 
     private StarterAssetsInputs inputs;
 
+    // 「初期位置に戻る」用に、ゲーム開始時のプレイヤーの位置・向きを記録しておく
+    private Vector3 playerStartPosition;
+    private Quaternion playerStartRotation;
+
     private void Start()
     {
         inputs = playerController.GetComponent<StarterAssetsInputs>();
+
+        playerStartPosition = playerController.transform.position;
+        playerStartRotation = playerController.transform.rotation;
 
         dialoguePanel.SetActive(false);
         talkHint.SetActive(false);
@@ -524,6 +532,27 @@ public class DialogueManager : MonoBehaviour
         SetTypingMode(false); // 移動再開・カーソル非表示
 
         currentState = GameState.FreeMove;
+    }
+
+    // 設定パネルの「初期位置に戻る」（README 13章 設定パネル）。クエストの進み具合はそのまま
+    public void RespawnPlayer()
+    {
+        var player = playerController.transform;
+        Vector3 delta = playerStartPosition - player.position;
+
+        var cc = playerController.GetComponent<CharacterController>();
+        cc.enabled = false;
+        player.SetPositionAndRotation(playerStartPosition, playerStartRotation);
+        cc.enabled = true;
+
+        // カメラが村の上空を横切って追いかけないよう、瞬間移動したことを伝える
+        foreach (var vcam in FindObjectsByType<CinemachineVirtualCameraBase>(FindObjectsSortMode.None))
+            vcam.OnTargetObjectWarped(vcam.Follow != null ? vcam.Follow : player, delta);
+
+        Debug.Log("[Player] Respawn to start position");
+
+        if (currentState == GameState.InSettings)
+            CloseSettings();
     }
 
     public void SetCurrentNPC(NPCDialogue npc)

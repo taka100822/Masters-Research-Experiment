@@ -9,17 +9,26 @@ public class SettingsPanelUI : MonoBehaviour
     [SerializeField] private GameObject settingsPanel;
     [SerializeField] private Slider bgmSlider;
     [SerializeField] private Slider seSlider;
+    [SerializeField] private Slider sensitivitySlider;
     [SerializeField] private TMP_Text bgmValueText;
     [SerializeField] private TMP_Text seValueText;
+    [SerializeField] private TMP_Text sensitivityValueText;
     [SerializeField] private Button titleButton;
+    [SerializeField] private Button respawnButton;
 
     public bool IsOpen => settingsPanel.activeSelf;
 
     private void Start()
     {
-        bgmSlider.onValueChanged.AddListener(v => OnSliderChanged(VolumeType.BGM, v));
-        seSlider.onValueChanged.AddListener(v => OnSliderChanged(VolumeType.SE, v));
+        bgmSlider.onValueChanged.AddListener(v => OnVolumeChanged(VolumeType.BGM, v));
+        seSlider.onValueChanged.AddListener(v => OnVolumeChanged(VolumeType.SE, v));
+
+        sensitivitySlider.minValue = LookSensitivitySettings.MinSensitivity;
+        sensitivitySlider.maxValue = LookSensitivitySettings.MaxSensitivity;
+        sensitivitySlider.onValueChanged.AddListener(OnSensitivityChanged);
+
         titleButton.onClick.AddListener(OnClickTitle);
+        respawnButton.onClick.AddListener(OnClickRespawn);
 
         settingsPanel.SetActive(false);
     }
@@ -33,6 +42,9 @@ public class SettingsPanelUI : MonoBehaviour
             seSlider.SetValueWithoutNotify(volume.SEVolume);
         }
 
+        if (LookSensitivitySettings.Instance != null)
+            sensitivitySlider.SetValueWithoutNotify(LookSensitivitySettings.Instance.Sensitivity);
+
         UpdateValueTexts();
         settingsPanel.SetActive(true);
     }
@@ -42,10 +54,18 @@ public class SettingsPanelUI : MonoBehaviour
         settingsPanel.SetActive(false);
     }
 
-    private void OnSliderChanged(VolumeType type, float value)
+    private void OnVolumeChanged(VolumeType type, float value)
     {
         if (AudioVolumeSettings.Instance != null)
             AudioVolumeSettings.Instance.SetVolume(type, value);
+
+        UpdateValueTexts();
+    }
+
+    private void OnSensitivityChanged(float value)
+    {
+        if (LookSensitivitySettings.Instance != null)
+            LookSensitivitySettings.Instance.SetSensitivity(value);
 
         UpdateValueTexts();
     }
@@ -54,11 +74,19 @@ public class SettingsPanelUI : MonoBehaviour
     {
         bgmValueText.text = Mathf.RoundToInt(bgmSlider.value * 100) + "%";
         seValueText.text = Mathf.RoundToInt(seSlider.value * 100) + "%";
+        sensitivityValueText.text = sensitivitySlider.value.ToString("0.0");
     }
 
     private void OnClickTitle()
     {
         // タイトル画面はまだ無い
         Debug.Log("[Settings] タイトルへ戻る（未実装）");
+    }
+
+    private void OnClickRespawn()
+    {
+        var dialogueManager = FindAnyObjectByType<DialogueManager>();
+        if (dialogueManager != null)
+            dialogueManager.RespawnPlayer();
     }
 }

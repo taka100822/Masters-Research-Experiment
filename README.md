@@ -430,7 +430,10 @@ Canvas
 │
 ├── TalkHint                ※ DialogueManagerが管理するグローバルなヒント
 │
-├── QuestPanel              ※ 右上のクエストチェックリスト（QuestPanelUIが管理、受注前は非表示）
+├── Minimap                 ※ 右上のミニマップ（MinimapUI）
+│   └── Viewport（MapImage・PlayerIcon・NPCアイコン）
+│
+├── QuestPanel              ※ ミニマップの下のクエストチェックリスト（QuestPanelUIが管理、受注前は非表示）
 │   ├── TitleText
 │   └── ClueText1〜4
 │
@@ -438,8 +441,9 @@ Canvas
 │   └── CompleteText
 │
 └── SettingsPanel           ※ Qキーで開く設定パネル（SettingsPanelUIが管理）
-    ├── HeaderText / TitleButton
-    ├── BGMRow / SERow（Label・Slider・Value）
+    ├── HeaderText
+    ├── BGMRow / SERow / SensitivityRow（Label・Slider・Value）
+    ├── TitleButton / RespawnButton
     └── HintText
 ```
 
@@ -461,19 +465,63 @@ NPC名（`npcId`）と会話内容を表示する。
 
 NPCに近づいた際に表示する2系統のヒントUI。
 
+## ミニマップ（2026-10-05 承認・実装済み）
+
+画面右上にプレイヤー中心のミニマップを常に表示し、自分の位置・向きと周りのNPCの位置を示す。今のクエストの依頼人は黄色（19.6.8の`clientColor`と同じ色）のアイコンにする。
+
+**画面配置**
+
+```text
+                         ┌──────────┐
+                         │  ミニマップ │ 170×170px（右上、端から12px）
+                         │  ・ ▲  ●  │ ▲＝プレイヤー（常に中央）
+                         └──────────┘
+                         ┌──────────┐
+                         │ 消えた薬草 │ QuestPanel（受注後に表示）
+                         │ □ 場所 …  │ ※ミニマップの真下へ移動する
+                         └──────────┘
+```
+
+**作り方**
+
+* 地図の絵：エディタ上で村の真上から正射影カメラで1回だけ撮影した画像（`Assets/Texture/minimap_village.png`、村の周りを含む一辺約128mの正方形）を使う。撮影時はNPCとプレイヤーを写さない。実行中に地図用のカメラを動かさないので軽い
+* 表示：**プレイヤーが常に中央**。プレイヤーの周り一辺約30mの範囲を表示し、歩くと地図がスクロールする（画像の表示範囲`uvRect`を動かす）。**北が上で固定**（地図は回転せず、プレイヤーの三角が向きを指す）
+* アイコン（UI上の点。`MinimapUI`が毎フレーム、プレイヤーからの相対位置(x, z)→ミニマップ上の位置に変換して動かす）
+
+| 対象 | 形 | 色 |
+|---|---|---|
+| プレイヤー | 三角（向いている方向を指す） | 水色 |
+| NPC | 丸 | 白 |
+| 今のクエストの依頼人 | 丸（少し大きめ） | 黄色（`clientColor`） |
+
+* 表示範囲の外にいるNPCは隠す。**依頼人だけは範囲外でもミニマップの縁に止めて表示**し、どちらの方向にいるかが分かるようにする
+* 会話中・設定パネル表示中も表示したままにする（終了画面では終了画面に隠れる）
+* 両クエスト・両条件で同じように出るので、条件差にはならない（20.1）。ただし依頼人の方向が常に分かり、近くのNPCも地図で見つけられるので、探索にかかる時間は短くなる
+
+**追加するもの**
+
+* スクリプト：`MinimapUI`（アイコンの配置と色分け）
+* 画像：`minimap_village.png`（地図）、`minimap_arrow.png`（プレイヤーの三角。スクリプトで生成）。丸はUnity標準の`Knob`画像を使う
+* シーン：`Canvas/Minimap`（枠）→`Viewport`（`RectMask2D`で切り抜き）→`MapImage`（`RawImage`）・`PlayerIcon`。NPCのアイコンは起動時に`MinimapUI`が`Viewport`の下に作る。`QuestPanel`は(-12, -190)へ移動
+* 地図画像の撮影範囲は中心(11, 128)・一辺128m（`MinimapUI`の`mapWorldCenter`／`mapWorldSize`と一致させること。NPCの配置や建物を変えたら撮り直す）
+* 依頼人の色は`NPCInteraction.ClientColor`を参照するので、吹き出し・名前・ミニマップで常に同じ色になる
+
 ## 設定パネル（2026-10-05 承認・実装済み）
 
-探索中に`Q`キーで開く設定パネル。BGM・SEの音量をスライダーで調整でき、「タイトルへ戻る」ボタンを置く（タイトル画面がまだ無いので、押しても今は何も起きない。Consoleにログだけ出す）。
+探索中に`Q`キーで開く設定パネル。上から **BGM音量・SE音量・視点感度のスライダー、「タイトルへ戻る」ボタン、「初期位置に戻る」ボタン** を並べる（2026-10-05に感度と初期位置を追加・並び替え。承認・実装済み）。「タイトルへ戻る」はタイトル画面がまだ無いので、押しても今は何も起きない（Consoleにログだけ出す）。
 
 **画面**
 
 ```text
 ┌────────────────────────────┐
 │ 設定                        │
-│      [ タイトルへ戻る ]      │
 │                            │
-│ BGM  ━━━━━━━●━━━  80%       │
-│ SE   ━━━━━━━●━━━  80%       │
+│ BGM   ━━━━━━━●━━━  80%      │
+│ SE    ━━━━━━━●━━━  80%      │
+│ 感度  ━━━━●━━━━━━  1.0      │
+│                            │
+│      [ タイトルへ戻る ]      │
+│      [ 初期位置に戻る ]      │
 │                            │
 │        Q：閉じる            │
 └────────────────────────────┘
@@ -491,6 +539,18 @@ NPCに近づいた際に表示する2系統のヒントUI。
 * 音は止めない（BGM・SEを鳴らしたままにして、スライダーを動かしながら音量を確かめられるようにする）
 * 開いていた時間はプレイ時間に含めない。Phase 8のログでは開閉時刻を記録し、時間を計るときは`Time.time`（止めている間は進まない）を使う想定
 
+**視点感度**
+
+* マウスで視点を回す速さの倍率。範囲0.2〜3.0、初期値1.0（今と同じ速さ）。表示は「1.0」のように小数1桁
+* 購入アセットの`ThirdPersonController`・`StarterAssets.inputactions`は変更しない。`LookSensitivitySettings`（`GameManager`に付けた）が、`PlayerInput`のLookアクションの各バインディングに、元からあるプロセッサ（マウス×0.05、ゲームパッド×300など）の後ろへ`ScaleVector2(x=感度,y=感度)`を実行中だけ追加する
+* 音量と同じく**保存せず、起動するたびに1.0に戻す**（参加者間で条件をそろえるため）
+
+**初期位置に戻る**
+
+* ゲーム開始時のプレイヤーの位置・向き（`DialogueManager.Start()`で記録）へ瞬間移動する（`DialogueManager.RespawnPlayer()`）。建物の隙間にはまって動けなくなったときなどの救済用。カメラが村の上空を横切って追いかけないよう、Cinemachineに瞬間移動を伝えている（`OnTargetObjectWarped`）
+* 押すと移動してパネルを閉じ、探索に戻る。クエストの進み具合（受注・手がかり）はそのまま
+* Phase 8のログでは「初期位置に戻った」回数・時刻も記録する想定
+
 **音量の仕組み**
 
 AudioMixerは使わず、音量を1か所で持って各音源（`AudioSource`）に掛ける。SEはプレイヤーの足音・着地音だけで、`Player/PlayerArmature/Audio/`の`Footstep_Concrete`・`Footstep_Land`（`ThirdPersonController`から`Play()`される`AudioSource`）で鳴っている。
@@ -502,8 +562,8 @@ AudioMixerは使わず、音量を1か所で持って各音源（`AudioSource`�
 
 **実装したもの**
 
-* スクリプト：`AudioVolumeSettings`・`VolumeChannel`・`SettingsPanelUI`（表示とスライダー・ボタンの処理。開閉の判定は`DialogueManager.OpenSettings()`／`CloseSettings()`）
-* シーン：`Canvas/SettingsPanel`（`HeaderText`・`TitleButton`・`BGMRow`・`SERow`・`HintText`）、`SettingsPanelUI`は`Canvas`に、`AudioVolumeSettings`は`GameManager`に、`VolumeChannel`（SE）は`Footstep_Concrete`・`Footstep_Land`に付けた
+* スクリプト：`AudioVolumeSettings`・`VolumeChannel`・`LookSensitivitySettings`・`SettingsPanelUI`（表示とスライダー・ボタンの処理。開閉の判定は`DialogueManager.OpenSettings()`／`CloseSettings()`、初期位置は`DialogueManager.RespawnPlayer()`）
+* シーン：`Canvas/SettingsPanel`（上から`HeaderText`・`BGMRow`・`SERow`・`SensitivityRow`・`TitleButton`・`RespawnButton`・`HintText`）、`SettingsPanelUI`は`Canvas`に、`AudioVolumeSettings`は`GameManager`に、`VolumeChannel`（SE）は`Footstep_Concrete`・`Footstep_Land`に付けた
 
 **BGM（2026-10-05追加）**
 
@@ -577,6 +637,9 @@ AudioVolumeSettings / VolumeChannel（13章 設定パネルで追加）
 
 SettingsPanelUI（13章 設定パネルで追加）
     └ 設定パネルのスライダー・ボタン処理
+
+MinimapUI（13章 ミニマップで追加）
+    └ プレイヤー中心のミニマップ（地図のスクロールとアイコン配置）
 ```
 
 `DialogueDatabase`／`ChatGPTClient`／`PromptData`／`NPCDialogue`／`NPCInteraction`は元仕様書の想定とおおむね一致。`GameManager`は責務が縮小されており、`Billboard`が新たに追加されている。
@@ -1294,6 +1357,24 @@ Unity 6000.4.2f1
 
 メインシーンは `Assets/MainScene.unity`（元仕様書は`Assets/Scenes/`配下を想定していたが、実際は`Assets`直下）。
 
+**空・環境光（2026-10-05）**
+
+* 空：Asset Storeの無料素材「Simple Sky - Cartoon assets」（`Assets/PurchasedAssets/SimpleSky/`）。スカイボックスではなく、シーンのルートに置いた`Sky`オブジェクトの中に、空のドーム（`SkyDome`プレハブ、村の中心(11, 0, 128)・スケール1.3・半径約430m）とローポリの雲12個（`Clouds`、高さ55〜95m・村から140〜280m）を置いている。どれも影を落とさない設定
+* 時間帯はマテリアルのUVオフセット（x）で決まる（0.1付近で地平線が黄色がかり夕方寄り、0.2で夕方、0.3以降で夜）。素材の`SimpleSky.mat`は直接いじらず、コピーした`Assets/Material/SimpleSky_Day.mat`（オフセット**−0.05**＝一番明るい昼の青空）をドームと雲に割り当てている（`PurchasedAssets`側の変更はGitHubに残らないため）。ドームに含まれる月（`Moon`）と星（`Stars`）は昼に合わないので非表示にした（太陽`Sun`は表示）
+* 太陽（`Directional Light`）の色温度は6500K（昼の白い光）。もとは5000Kで光が黄色っぽく、夕方のように見えていた
+* ドームはカメラの描画距離（500m）の内側に収まる大きさにしてある。ドームを大きくしたり、カメラのFar Clipを小さくしたりすると空が消えるので注意
+* スカイボックスは使わない（`RenderSettings.skybox`なし）。環境光は3色指定（Ambient Source: Gradient／Trilight：空 RGB(140,184,242)・地平線 RGB(199,209,219)・地面 RGB(107,115,92)）。焼き込みライティングは使わない設定（`Assets/Settings/MainSceneLighting.lighting`：Baked GI・Realtime GIともオフ）
+* `PurchasedAssets`はGitHubに含まれないので、**別のPCで開くときはAsset Storeから「Simple Sky - Cartoon assets」をインポートし、`Assets/PurchasedAssets/SimpleSky/`に置くこと**（置かないと空が表示されない）
+* 最初に試した「Skybox Series Free」（374MB）は使わないことにしたため削除した（2026-10-05）
+
+**水に入れないようにする壁（2026-10-05）**
+
+* 水面（`Background/Landscape/Water`、高さy=−0.9）は平らな当たり判定を持つが、岸の地面が水面の下までなだらかに続いているため、そのままでは浅瀬に歩いて入れた
+* シーンのルートに`WaterBlockers`を置き、岸に沿って見えない当たり判定の箱（`Blocker`、697個・高さ6m・`Water`レイヤー）を並べた。0.5m四方ごとに「水面以外の当たり判定の一番高い所が水面より低いか」を上から調べ、陸と接している水のマスにだけ壁を置いている
+* 桟橋（`ModularWood_*`）・岩・ボートは当たり判定があるので「陸」扱い。桟橋の上は先端まで歩け、脇からは落ちない
+* `Water`レイヤーはカメラの衝突判定（`Default`のみ）に含まれないので、カメラが見えない壁に押し戻されることはない
+* **岸の地形・桟橋・水面の高さを変えたら壁の作り直しが必要**（作り直しはエディタでスクリプトを1回実行する方式で、手で並べたものではない）
+
 ---
 
 # 27. 今後の拡張候補（変更なし）
@@ -1303,7 +1384,7 @@ Unity 6000.4.2f1
 * NPCの視線、NPCの表情変化
 * 会話ログ閲覧
 * クエストUI
-* ミニマップ
+* ミニマップ（2026-10-05 実装済み）
 * サウンド、環境音
 * NPCの生活行動
 * より自然な会話演出

@@ -17,6 +17,8 @@ public class NPCInteraction : MonoBehaviour
     private Image bubbleImage;
     private Color defaultBubbleColor;
 
+    public Color ClientColor => clientColor;
+
     private void Start()
     {
         var npc = GetComponent<NPCDialogue>();
@@ -58,7 +60,7 @@ public class NPCInteraction : MonoBehaviour
         bubbleImage.color = IsQuestClient() ? clientColor : defaultBubbleColor;
     }
 
-    private bool IsQuestClient()
+    public bool IsQuestClient()
     {
         var quest = QuestManager.Instance != null ? QuestManager.Instance.Quest : null;
         var npc = GetComponent<NPCDialogue>();
