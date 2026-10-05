@@ -9,7 +9,7 @@ public enum QuestState
     Completed
 }
 
-// クエストの進行状態と取得済み手がかりを管理する（README 19.6）
+// クエストの進行状態と取得済み手がかりを管理する（README 5.1）
 // StartQuest / AddClue / Complete は実験ログ（Phase 8）のフックポイントにもなる
 public class QuestManager : MonoBehaviour
 {

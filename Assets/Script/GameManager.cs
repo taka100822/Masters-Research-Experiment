@@ -1,10 +1,10 @@
 using UnityEngine;
 
+// シングルトン。ChatGPTClientなどMainScene全体で使うコンポーネントを持つGameObjectの目印
+// （ゲームの状態はDialogueManagerが管理する。README 4.1）
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance;
-
-    public GameState State { get; private set; } = GameState.FreeMove;
 
     private void Awake()
     {
@@ -16,15 +16,5 @@ public class GameManager : MonoBehaviour
         {
             Destroy(gameObject);
         }
-    }
-
-    public void SetState(GameState newState)
-    {
-        State = newState;
-    }
-
-    public bool IsFree()
-    {
-        return State == GameState.FreeMove;
     }
 }

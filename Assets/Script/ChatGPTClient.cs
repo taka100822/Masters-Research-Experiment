@@ -7,8 +7,6 @@ public class ChatGPTClient : MonoBehaviour
 {
     private string apiKey;
 
-    [SerializeField] private PromptData promptData;
-
     // OpenAI API
     private const string endpoint = "https://api.openai.com/v1/chat/completions";
 
@@ -17,6 +15,20 @@ public class ChatGPTClient : MonoBehaviour
 
     // 実験ログに記録するため（README 6.3）
     public static string ModelName => model;
+
+    // これ以上待っても返答が無ければ打ち切る（README 4.6）
+    private const int TimeoutSeconds = 20;
+
+    // 問い合わせの結果。失敗時はErrorに理由（timeout / network / http_<code> / parse / no_key）が入る
+    public struct ChatResult
+    {
+        public bool Success;
+        public string Text;
+        public string Error;
+
+        public static ChatResult Ok(string text) => new ChatResult { Success = true, Text = text };
+        public static ChatResult Fail(string error) => new ChatResult { Success = false, Error = error };
+    }
 
     [System.Serializable]
     public class ChatRequest
@@ -69,10 +81,13 @@ public class ChatGPTClient : MonoBehaviour
         apiKey = keyFile.text.Trim();
     }
 
-    public async Task<string> SendChatMessage(
+    public async Task<ChatResult> SendChatMessage(
         string userText,
         string systemPrompt)
     {
+        if (string.IsNullOrEmpty(apiKey))
+            return ChatResult.Fail("no_key");
+
         string json = BuildRequest(userText, systemPrompt);
 
         using var request = new UnityWebRequest(endpoint, "POST");
@@ -81,6 +96,7 @@ public class ChatGPTClient : MonoBehaviour
 
         request.uploadHandler = new UploadHandlerRaw(bodyRaw);
         request.downloadHandler = new DownloadHandlerBuffer();
+        request.timeout = TimeoutSeconds;
 
         request.SetRequestHeader(
             "Content-Type",
@@ -107,7 +123,12 @@ public class ChatGPTClient : MonoBehaviour
                 $"{request.downloadHandler.text}"
             );
 
-            return "エラー";
+            string reason =
+                request.result == UnityWebRequest.Result.ProtocolError ? "http_" + request.responseCode :
+                request.error != null && request.error.ToLower().Contains("timeout") ? "timeout" :
+                "network";
+
+            return ChatResult.Fail(reason);
         }
 
         return ParseResponse(
@@ -142,7 +163,7 @@ public class ChatGPTClient : MonoBehaviour
         return JsonUtility.ToJson(request);
     }
 
-    private string ParseResponse(string json)
+    private ChatResult ParseResponse(string json)
     {
         try
         {
@@ -158,10 +179,10 @@ public class ChatGPTClient : MonoBehaviour
                     "Invalid response from OpenAI API."
                 );
 
-                return "エラー";
+                return ChatResult.Fail("parse");
             }
 
-            return response.choices[0].message.content;
+            return ChatResult.Ok(response.choices[0].message.content);
         }
         catch (System.Exception e)
         {
@@ -169,7 +190,7 @@ public class ChatGPTClient : MonoBehaviour
                 $"Failed to parse OpenAI response: {e}"
             );
 
-            return "エラー";
+            return ChatResult.Fail("parse");
         }
     }
 }

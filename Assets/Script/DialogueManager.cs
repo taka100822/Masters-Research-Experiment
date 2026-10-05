@@ -43,6 +43,13 @@ public class DialogueManager : MonoBehaviour
 
     private StarterAssetsInputs inputs;
 
+    // AIの返答待ち・失敗時に出す文（README 4.6）
+    private const string WaitingText = "……";
+    private const string AIErrorText = "（うまく伝わらなかったようだ。もう一度話しかけてみよう）";
+
+    // 送れなかった文章。次に「入力する」を選んだとき入力欄に戻す
+    private string lastFailedInput;
+
     // 「初期位置に戻る」用に、ゲーム開始時のプレイヤーの位置・向きを記録しておく
     private Vector3 playerStartPosition;
     private Quaternion playerStartRotation;
@@ -147,7 +154,7 @@ public class DialogueManager : MonoBehaviour
         StartNode(SelectStartNode());
     }
 
-    // Dialogue/Q{クエスト番号}/ → Dialogue/Common/ → Dialogue/ の順で探す（README 19.6.3）
+    // Dialogue/Q{クエスト番号}/ → Dialogue/Common/ の順で探す（README 4.4）
     private bool LoadDialogueCSV(string csvFileName)
     {
         int questNumber = ExperimentSettings.Instance != null
@@ -155,11 +162,10 @@ public class DialogueManager : MonoBehaviour
             : 1;
 
         return dialogueDatabase.LoadCSV("Dialogue/Q" + questNumber + "/" + csvFileName)
-            || dialogueDatabase.LoadCSV("Dialogue/Common/" + csvFileName)
-            || dialogueDatabase.LoadCSV("Dialogue/" + csvFileName);
+            || dialogueDatabase.LoadCSV("Dialogue/Common/" + csvFileName);
     }
 
-    // クエスト状態ごとの開始ノード。無ければ後ろの候補へ（README 19.6.4）
+    // クエスト状態ごとの開始ノード。無ければ後ろの候補へ（README 4.4）
     private int SelectStartNode()
     {
         int[] candidates = new[] { 0 };
@@ -300,7 +306,7 @@ public class DialogueManager : MonoBehaviour
         ShowNode();
     }
 
-    // CSVのaction列をクエストに反映する（README 19.6.3）
+    // CSVのaction列をクエストに反映する（README 4.4）
     private void ExecuteNodeAction(string action)
     {
         var quest = QuestManager.Instance;
@@ -390,7 +396,8 @@ public class DialogueManager : MonoBehaviour
 
         SetTypingMode(true);
 
-        inputField.text = "";
+        // 前回送れなかった文章があれば残しておき、そのまま送り直せるようにする（README 4.6）
+        inputField.text = lastFailedInput ?? "";
         inputField.ActivateInputField();
     }
 
@@ -427,21 +434,31 @@ public class DialogueManager : MonoBehaviour
             return;
         }
 
+        // 返答を待っている間は「……」を出す（止まって見えないように。README 4.6）
+        dialoguePanel.SetActive(true);
+        nextIndicator.SetActive(false);
+        dialogueText.text = WaitingText;
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        string reply = await chatGPT.SendChatMessage(
+        var result = await chatGPT.SendChatMessage(
             text,
             prompt.systemPrompt
         );
         stopwatch.Stop();
 
-        // ChatGPTClientは失敗時に「エラー」を返す（README 4.5）
-        ExperimentLogger.Log("ai_response", npcId: npcId, nodeId: nodeId, text: reply, isError: reply == "エラー",
-            detail: "prompt=" + promptPath + ";hash=" + ExperimentLogger.Hash8(prompt.systemPrompt) + ";latency_ms=" + stopwatch.ElapsedMilliseconds);
+        string shown = result.Success ? result.Text : AIErrorText;
+        lastFailedInput = result.Success ? null : text;
 
-        ShowAIResponse(reply);
+        string detail = "prompt=" + promptPath + ";hash=" + ExperimentLogger.Hash8(prompt.systemPrompt) + ";latency_ms=" + stopwatch.ElapsedMilliseconds;
+        if (!result.Success)
+            detail += ";error=" + result.Error;
+
+        ExperimentLogger.Log("ai_response", npcId: npcId, nodeId: nodeId, text: shown, isError: !result.Success, detail: detail);
+
+        ShowAIResponse(shown);
     }
 
-    // PromptData/Q{クエスト番号}/ → PromptData/Common/ → NPCDialogue.promptData の順で探す（README 19.7.2）
+    // PromptData/Q{クエスト番号}/ → PromptData/Common/ → NPCDialogue.promptData の順で探す（README 4.5）
     // pathには見つかった場所（ログ用。例：Q1/NPC005）が入る
     private PromptData LoadPromptData(NPCDialogue npc, out string path)
     {
@@ -498,7 +515,7 @@ public class DialogueManager : MonoBehaviour
 
         playerController.enabled = true;
 
-        // 達成会話を閉じたら終了画面へ（README 19.6.7）
+        // 達成会話を閉じたら終了画面へ（README 3.5）
         if (QuestManager.Instance != null &&
             QuestManager.Instance.State == QuestState.Completed)
         {
@@ -540,7 +557,7 @@ public class DialogueManager : MonoBehaviour
     }
 
     // =========================
-    // Settings（README 13章 設定パネル）
+    // Settings（README 3.6）
     // =========================
 
     private void OpenSettings()
@@ -577,7 +594,7 @@ public class DialogueManager : MonoBehaviour
         currentState = GameState.FreeMove;
     }
 
-    // 設定パネルの「初期位置に戻る」（README 13章 設定パネル）。クエストの進み具合はそのまま
+    // 設定パネルの「初期位置に戻る」（README 3.6）。クエストの進み具合はそのまま
     public void RespawnPlayer()
     {
         var player = playerController.transform;

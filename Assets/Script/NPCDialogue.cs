@@ -10,10 +10,9 @@ public class NPCDialogue : MonoBehaviour
 
     public string DisplayName => string.IsNullOrEmpty(displayName) ? npcId : displayName;
 
-    public bool allowUserInput;
-
     [Header("CSVファイル名")]
     public string csvFileName;
 
+    [Tooltip("クエスト別・共通のプロンプトが無いときに使う予備（README 4.5）")]
     public PromptData promptData;
 }

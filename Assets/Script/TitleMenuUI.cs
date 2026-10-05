@@ -3,7 +3,7 @@ using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using TMPro;
 
-// タイトル画面のボタンと開発者用モーダル（README 13章 タイトル画面）
+// タイトル画面のボタンと開発者用モーダル（README 3.1）
 public class TitleMenuUI : MonoBehaviour
 {
     public const string MainSceneName = "MainScene";

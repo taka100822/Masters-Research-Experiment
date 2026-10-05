@@ -7,7 +7,7 @@ public enum VolumeType
     SE
 }
 
-// BGM・SE音量を1か所で保持する（README 13章 設定パネル）
+// BGM・SE音量を1か所で保持する（README 3.6）
 // 参加者間で条件をそろえるため保存はせず、起動するたびに初期値に戻す
 public class AudioVolumeSettings : MonoBehaviour
 {

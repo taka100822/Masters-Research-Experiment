@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using StarterAssets;
 
-// プレイヤー中心・北が上のミニマップ（README 13章 ミニマップ）
+// プレイヤー中心・北が上のミニマップ（README 3.4）
 // 地図はエディタで撮影した静止画（minimap_village.png）の表示範囲を動かしてスクロールさせる
 public class MinimapUI : MonoBehaviour
 {

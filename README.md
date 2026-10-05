@@ -205,7 +205,7 @@ Canvas（Screen Space Overlay）
 | 今のクエストの依頼人 | 少し大きい丸 | 金色（`clientColor`） |
 
 * 表示範囲の外のNPCは隠す。**依頼人だけは範囲外でも縁に止めて表示**し、方向が分かるようにする
-* NPCの配置や建物を変えたら地図画像を撮り直す（撮影範囲は`MinimapUI`の`mapWorldCenter`／`mapWorldSize`と一致させる）
+* NPCの配置や建物を変えたら、Unityのメニュー **Tools → 研究用 → ミニマップの地図を撮り直す** で撮り直す（撮影範囲は`MinimapUI`の`mapWorldCenter`／`mapWorldSize`から自動で読む。NPCとプレイヤーは写らない）
 
 ## 3.5 クエストのチェックリストと終了画面
 
@@ -292,7 +292,7 @@ AIの返答をNPCのセリフとして表示
 
 ## 4.4 会話データ（CSV）
 
-`Assets/Resources/dialogue/`に、NPC1人につき1つのCSVを置く（`DialogueDatabase`が読み込む。ファイル名は`DialogeDatabase.cs`でクラス名と綴りが違う点に注意）。
+`Assets/Resources/dialogue/`に、NPC1人につき1つのCSVを置く（`DialogueDatabase`が、会話を始めるときに読み込む）。
 
 ```text
 id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, action
@@ -307,7 +307,7 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 | `allowInput` | `1`なら条件Bで「入力する」を出す（列が無いCSVは0扱い） |
 | `action` | ノードを表示した瞬間に実行する：`startQuest`（依頼を受ける）／`clue:<手がかりID>`（手がかりを得る）／`complete`（達成）。空なら何もしない |
 
-**読み込む場所**：`Dialogue/Q{クエスト番号}/{csvFileName}` → `Dialogue/Common/{csvFileName}` → `Dialogue/{csvFileName}` の順に探す。クエストに関係するNPCは`Q1/`・`Q2/`、関係ないときの世間話は`Common/`に置く。
+**読み込む場所**：`Dialogue/Q{クエスト番号}/{csvFileName}` → `Dialogue/Common/{csvFileName}` の順に探す。クエストに関係するNPCは`Q1/`・`Q2/`、関係ないときの世間話は`Common/`に置く。
 
 **会話を始めるノード**：クエストの状態ごとに決まっていて、そのIDのノードが無ければ次の候補へ進む。
 
@@ -324,10 +324,10 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 
 * **API**：OpenAI Chat Completions API（`https://api.openai.com/v1/chat/completions`）に`UnityWebRequest`で送る（`ChatGPTClient`）。`ChatGPTClient`は通信だけを担当し、UIやプレイヤー操作には触れない
 * **APIキー**：`Assets/Resources/openai_key.txt`から読む（`.gitignore`済み。GitHubには上げない）
-* **モデル**：`ChatGPTClient.cs`の定数`model = "gpt-5.6-luna"`。**要確認**：実験開始前に、APIで実際に使えるモデル名か確認する。確認後は実験期間中に変えない（1.5）
+* **モデル**：`ChatGPTClient.cs`の定数`model = "gpt-5.6-luna"`（2026-10-05に動作確認済み）。実験期間中は変えない（1.5）
 * **プロンプトの読み込み**：`PromptData/Q{クエスト番号}/{npcId}` → `PromptData/Common/{npcId}` → `NPCDialogue.promptData` の順に探す（`DialogueManager.LoadPromptData()`）。どれも無ければ送信せず、NPCのセリフとして「……（今は話せないようだ）」を表示してConsoleにエラーを出す
 * **プロンプトの形式**：`PromptData`（ScriptableObject）の`systemPrompt`という1つの文字列。名前・性格・知っている情報などは、下のテンプレートに沿って文章の中に書く
-* **エラー**：通信やJSONの解析に失敗すると、`SendChatMessage`は例外を投げずに「エラー」という文字列を返し、それがそのままNPCのセリフとして表示される（ゲームは止まらない）。参加者向けの分かりやすいメッセージはまだ無い（10.3）
+* **エラー**：通信の失敗・時間切れ（20秒）・返答の解析失敗・APIキーが無い、のどれでもゲームは止まらず、参加者向けの一文を表示する（4.6）
 
 **AIに守らせること**（プロンプトの文面で守らせる。コード側での検査はしていない）
 
@@ -364,6 +364,29 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 ```
 
 `{{クエストの答え}}`はクエスト1が「薬草がどうなったかの答え」、クエスト2が「灯篭がどこにあるかの答え」。【知らない情報】と【会話のルール】は全員同じ文面にする。
+
+## 4.6 AIの返答が得られなかったとき（承認・実装済み）
+
+参加者が「壊れた」と感じたり、操作できなくなったりしないようにする。
+
+**待っている間**
+* 送信したら、会話ウィンドウのセリフを「……」にして、返答を待っていることが分かるようにする（今は直前のセリフが出たまま止まって見える）
+
+**時間切れ**
+* 今は問い合わせに制限時間が無く、通信が固まると参加者がずっと待たされて操作できなくなる。**20秒**で打ち切り、エラーとして扱う（`UnityWebRequest.timeout`）
+
+**エラーのときの表示**
+* 「エラー」の代わりに、世界観を壊さない一文をNPCのセリフ欄に出す：
+  `（うまく伝わらなかったようだ。もう一度話しかけてみよう）`
+  （かっこ書きのナレーションにして、NPC本人のセリフに見えないようにする。全NPC共通）
+* エラーかどうかは、`ChatGPTClient.SendChatMessage`が返す`ChatResult`（`Success`／`Text`／`Error`）で判定する。「エラー」という文字列はもう返さない
+
+**もう一度試す**
+* エラーのあとEnterを押すと、これまでどおり同じノードの選択肢（「入力する」を含む）に戻る（5.3の`nextId`＝自分自身の仕組み）
+* そこで「入力する」を選ぶと、**失敗した文章が入力欄に残っている**ので、そのまま送信し直せる（成功したら入力欄は空に戻す）
+
+**ログ**
+* `ai_response`の`text`には参加者に表示した一文を、`detail`に失敗の理由を書く（`error=timeout`／`network`／`http_<コード>`／`parse`／`no_key`）。`is_error=1`は今までどおり
 
 ---
 
@@ -698,7 +721,7 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 | `respawn` | 「初期位置に戻る」を押した | 押す前の位置（`from_x`／`from_z`） |
 | `session_end` | セッションの終わり | 終わり方（`quest_complete`／`back_to_title`／`app_quit`。それ以外でシーンが消えたときは`scene_unloaded`）・総プレイ時間。会話中・設定パネル表示中に終わった場合は、先にその`dialogue_end`／`settings_close`を書く |
 
-* **AIのエラー**：返答が「エラー」（4.5）なら`is_error=1`にする。プロンプトが見つからなかったときも`is_error=1`（`detail`は`prompt=none`）
+* **AIのエラー**：返答が得られなかったら`is_error=1`にし、`detail`に理由（`error=…`）を書く（4.6）。プロンプトが見つからなかったときも`is_error=1`（`detail`は`prompt=none`）
 * `npc_line`はノードを表示するたびに書く（AIの返答のあと同じノードに戻ったときも、もう一度書かれる）
 * 会話時間（`dialogue_end`の`duration`）・達成までの時間（`quest_complete`の`duration`）・会話ごとの選択回数と自由入力回数は、`ExperimentLogger`が自分で計算して書く
 * **プロンプトの識別子**：使った`PromptData`の場所（例：`Q1/NPC005`）と、本文のハッシュ値（先頭8文字）。実験期間中にプロンプトが変わっていないかを後から確認できる（1.5）
@@ -808,7 +831,7 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 * 水面（`Background/Landscape/Water`、y=−0.9）まで岸の地面がなだらかに続いていて、そのままでは浅瀬に入れてしまう。そこでシーンのルートの`WaterBlockers`に、岸に沿って見えない当たり判定の箱（`Blocker`、697個・高さ6m）を並べている
 * 0.5m四方ごとに「水面以外の当たり判定の一番高い所が水面より低いか」を調べ、陸と接している水のマスにだけ置いた。桟橋・岩・ボートは陸として扱うので、桟橋の上は先端まで歩ける
 * 箱は`Water`レイヤー。カメラの衝突判定（`Default`のみ）に含まれないので、カメラが押し戻されることはない
-* 岸の地形・桟橋・水面の高さを変えたら作り直しが必要（エディタでスクリプトを1回実行して並べたもので、その処理はプロジェクトに保存していない）
+* 岸の地形・桟橋・水面の高さを変えたら、Unityのメニュー **Tools → 研究用 → 水の壁を作り直す** で作り直す（`Assets/Editor/SceneBuildTools.cs`）
 
 ## 7.7 GitHubに含まれないもの・別のPCで開くとき
 
@@ -827,16 +850,16 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 
 | クラス | 役割 |
 |---|---|
-| `GameManager` | シングルトン。`ChatGPTClient`を持つ。`State`／`SetState`／`IsFree`はあるが使われていない |
+| `GameManager` | シングルトン。MainScene全体で使うコンポーネント（`ChatGPTClient`など）を持つGameObjectの目印 |
 | `ExperimentConfig`（static） | タイトル画面で設定した実験設定をMainSceneへ渡す |
 | `ExperimentSettings` | 参加者ID・条件・クエスト番号（MainScene） |
 | `TitleMenuUI` | タイトル画面のボタンと開発者用モーダル（TitleScene） |
 | `DialogueManager` | 会話の進行・会話UI・状態管理の中心。プレイヤーの停止、設定パネルの開閉、初期位置に戻る処理も担当 |
-| `DialogueDatabase`（ファイル名`DialogeDatabase.cs`） | 会話CSVの読み込み |
-| `NPCDialogue` | NPCごとのデータ（`npcId`・`displayName`・`csvFileName`・`promptData`・`allowUserInput`（未使用）） |
+| `DialogueDatabase` | 会話CSVの読み込み |
+| `NPCDialogue` | NPCごとのデータ（`npcId`・`displayName`・`csvFileName`・`promptData`（クエスト別・共通のプロンプトが無いときの予備）） |
 | `NPCInteraction` | 近づいたかの判定、頭上の名前・吹き出し、依頼人の色分け |
 | `Billboard` | 頭上UIを常にカメラへ向ける |
-| `ChatGPTClient` | OpenAI APIとの通信 |
+| `ChatGPTClient` | OpenAI APIとの通信。結果は`ChatResult`（成功／失敗と理由）で返す |
 | `PromptData`（ScriptableObject） | NPCのシステムプロンプト |
 | `QuestData`（ScriptableObject） | クエスト1件分のデータ |
 | `QuestManager` | クエストの進行状態と手がかり |
@@ -847,6 +870,7 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 | `LookSensitivitySettings` | 視点感度 |
 | `ExperimentLogger` | 実験ログ（6章） |
 | `GameState`（enum） | 4.1 |
+| `SceneBuildTools`（エディタ用） | メニュー「Tools/研究用」：水の壁を作り直す・ミニマップの地図を撮り直す |
 
 ---
 
@@ -898,15 +922,21 @@ Claude Codeが本仕様書を参照し、Unity MCP経由で開発する。
 * [ ] 日本語を入力できる（`TMP_InputField`の日本語IMEは実機で要確認）
 * [x] 会話・自由入力・会話時間・達成時間をログに保存できる（6章。自由入力とAI返答の記録は条件Bでの実プレイで要確認）
 
-## 10.3 未対応・要確認
+## 10.3 片付け（2026-10-05 実装済み）
 
-* **AIのモデル名**：`gpt-5.6-luna`が実際に使えるか、実験前に確認する（4.5）
-* **AIのエラー表示**：通信失敗時に「エラー」とだけ表示される。参加者向けの分かりやすいメッセージ（例：「通信エラーが発生しました。もう一度送信してください。」）は未実装
-* **使われていないもの**：`GameManager.State`／`SetState`／`IsFree`、`NPCDialogue.allowUserInput`
-* **古いテストデータ**：`Resources/dialogue/NPC001.csv`・`NPC002.csv`と`Resources/PromptData/NPC001.asset`（クエスト導入前のもの。今は`Q1/`・`Q2/`・`Common/`が優先されるので使われない）。`DialogueDatabase`は起動時に`Dialogue/NPC001`を読み込んでいる（Consoleの`Node Count = 4`）
-* **ファイル名の不一致**：`DialogeDatabase.cs`（クラス名は`DialogueDatabase`）
+* 古いテスト用データを削除：`Resources/dialogue/NPC001.csv`・`NPC002.csv`、`Resources/PromptData/NPC001.asset`（NPC001の参照も外した）。会話データを探す順番から`Dialogue/`直下を外した
+* `DialogueDatabase`の起動時の不要な読み込み（`Node Count = 4`）を削除
+* `DialogeDatabase.cs` → `DialogueDatabase.cs`に名前を修正（シーンの参照はそのまま）
+* 使われていないコードを削除：`GameManager.State`／`SetState`／`IsFree`、`NPCDialogue.allowUserInput`、`ChatGPTClient`の`promptData`欄
+* デバッグ用ログ`NPC SET`／`NPC CLEARED`を削除
+* コードのコメントの章番号を今のREADMEに合わせた
+* 水の壁・ミニマップの地図をUnityのメニュー「Tools/研究用」から作り直せるようにした（7.6・3.4）
 
-## 10.4 今後の拡張候補
+## 10.4 要確認
+
+* 日本語の自由入力（IMEでの変換・確定）がビルド版で問題なく使えるか（10.2）
+
+## 10.5 今後の拡張候補
 
 研究に必要なものを優先し、それ以外は実験の基本機能が完成してから検討する。
 

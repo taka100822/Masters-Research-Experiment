@@ -3,7 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using UnityEngine.SceneManagement;
 
-// 設定パネルの表示とスライダー・ボタンの処理（README 13章 設定パネル）
+// 設定パネルの表示とスライダー・ボタンの処理（README 3.6）
 // 開閉のタイミング（Qキー・状態遷移）はDialogueManagerが管理する
 public class SettingsPanelUI : MonoBehaviour
 {

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// クエスト1件分の静的データ（README 19章）
+// クエスト1件分の静的データ（README 5.1）
 [CreateAssetMenu(fileName = "QuestData", menuName = "Quest/QuestData")]
 public class QuestData : ScriptableObject
 {
@@ -21,7 +21,7 @@ public class QuestData : ScriptableObject
     public int questId;
     public string title;
 
-    [Tooltip("依頼人のnpcId（吹き出しの色分けに使う。README 19.6.8）")]
+    [Tooltip("依頼人のnpcId（吹き出しの色分けに使う。README 3.3）")]
     public string clientNpcId;
 
     public List<Clue> clues = new();

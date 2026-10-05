@@ -1,4 +1,4 @@
-// タイトル画面（開発者用モーダル）で設定した実験設定を、MainSceneへ渡すためのstaticな置き場（README 13章 タイトル画面）
+// タイトル画面（開発者用モーダル）で設定した実験設定を、MainSceneへ渡すためのstaticな置き場（README 3.1）
 // ファイルには保存しない。アプリを起動し直すと初期値に戻る
 public static class ExperimentConfig
 {

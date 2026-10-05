@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// 視点（カメラ回転）の感度。PlayerInputのLookアクションに実行中だけ倍率を掛ける（README 13章 設定パネル）
+// 視点（カメラ回転）の感度。PlayerInputのLookアクションに実行中だけ倍率を掛ける（README 3.6）
 // 購入アセット（ThirdPersonController・StarterAssets.inputactions）は変更しない
 // 参加者間で条件をそろえるため保存はせず、起動するたびに初期値に戻す
 public class LookSensitivitySettings : MonoBehaviour

@@ -7,10 +7,10 @@ public class NPCInteraction : MonoBehaviour
 {
     [SerializeField] private GameObject bubbleUI;
 
-    [Tooltip("頭上に常に表示する名前（README 19.6.9）")]
+    [Tooltip("頭上に常に表示する名前（README 3.3）")]
     [SerializeField] private TMP_Text nameLabel;
 
-    [Tooltip("今のクエストの依頼人のときの吹き出しと名前の色（README 19.6.8）")]
+    [Tooltip("今のクエストの依頼人のときの吹き出しと名前の色（README 3.3）")]
     [FormerlySerializedAs("clientBubbleColor")]
     [SerializeField] private Color clientColor = new Color(1f, 0.82f, 0.2f, 1f);
 
@@ -76,8 +76,6 @@ public class NPCInteraction : MonoBehaviour
 
             FindAnyObjectByType<DialogueManager>()
                 .SetCurrentNPC(GetComponent<NPCDialogue>());
-
-            Debug.Log("NPC SET");
         }
     }
 
@@ -89,8 +87,6 @@ public class NPCInteraction : MonoBehaviour
 
             FindAnyObjectByType<DialogueManager>()
                 .SetCurrentNPC(null);
-
-            Debug.Log("NPC CLEARED");
         }
     }
 }
