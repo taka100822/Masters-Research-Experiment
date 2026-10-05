@@ -17374,7 +17374,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NPCDialogue
   npcId: NPC004
-  displayName: "\u6751\u9577\u30C8\u30FC\u30DE\u30B9"
+  displayName: "\u6751\u9577\u30CB\u30B3\u30E9"
   csvFileName: NPC004
   promptData: {fileID: 0}
 --- !u!143 &249720700
@@ -72766,7 +72766,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NPCDialogue
   npcId: NPC005
-  displayName: "\u935B\u51B6\u5C4B\u30AC\u30EB\u30C9"
+  displayName: "\u935B\u51B6\u5C4B\u30E4\u30CB\u30B9"
   csvFileName: NPC005
   promptData: {fileID: 0}
 --- !u!143 &1103654281
@@ -89638,7 +89638,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NPCDialogue
   npcId: NPC003
-  displayName: "\u85AC\u5E2B\u30B8\u30E7\u30F3"
+  displayName: "\u85AC\u5E2B\u30C6\u30A3\u30E0"
   csvFileName: NPC003
   promptData: {fileID: 0}
 --- !u!143 &1361604752
@@ -100300,7 +100300,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NPCDialogue
   npcId: NPC001
-  displayName: "\u5546\u4EBA\u30D9\u30EB\u30F3"
+  displayName: "\u5546\u4EBA\u30F4\u30A3\u30AF\u30BF\u30FC"
   csvFileName: NPC001
   promptData: {fileID: 0}
 --- !u!114 &1519829571
@@ -113489,7 +113489,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NPCDialogue
   npcId: NPC006
-  displayName: "\u6599\u7406\u4EBA\u30DE\u30EB\u30B3"
+  displayName: "\u6599\u7406\u4EBA\u30B9\u30C6\u30D5"
   csvFileName: NPC006
   promptData: {fileID: 0}
 --- !u!143 &1695637265
