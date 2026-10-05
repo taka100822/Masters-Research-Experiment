@@ -697,7 +697,9 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 | 実行のしかた | 保存先 |
 |---|---|
 | ビルドしたアプリ（実験本番） | アプリ（.exe）と同じフォルダの`ExperimentLogs/` |
-| Unityエディタ | プロジェクトのルートの`ExperimentLogs/`（`.gitignore`済み。GitHubには上げない） |
+| Unityエディタ | `Assets/ExperimentLogs/`（`.gitignore`済み。GitHubには上げない） |
+
+* エディタではUnityがCSVをテキストアセットとして取り込み、`.meta`を作る（ログの中身には影響しない）。`.meta`も`.gitignore`の対象
 
 * ファイル名：`{参加者ID}_{条件}_Q{クエスト番号}_{開始日時}.csv`（例：`P001_B_Q2_20261012_143005.csv`）
 * `summary.csv`も同じフォルダ
@@ -840,7 +842,7 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 | `Assets/PurchasedAssets/`（Village・Starter Assets・キャラクター・Simple Skyなど） | 購入アセットなので`.gitignore`で除外 | 同じアセットをインポートして`Assets/PurchasedAssets/`に置く（Simple Skyは`Assets/PurchasedAssets/SimpleSky/`） |
 | `ThirdPersonController.cs`への変更（`StopMotion()`など） | 上のフォルダの中にあるため | 同じメソッドを手で追加する（無いと`DialogueManager`がコンパイルエラーになる） |
 | `Assets/Resources/openai_key.txt` | APIキー | 自分のAPIキーを書いたファイルを置く |
-| `ExperimentLogs/` | 実験データ | — |
+| `Assets/ExperimentLogs/`（エディタで記録したログ） | 実験データ | — |
 
 `Assets/Fonts/`も`.gitignore`の対象だが、使っているフォントとマテリアル（`NotoSansJP-Regular SDF.asset`・`NameOutline.mat`・`TitleOutline.mat`）は個別に登録してある。新しく足すときも`git add -f`で登録する。
 

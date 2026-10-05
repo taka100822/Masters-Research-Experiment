@@ -19,9 +19,11 @@ public class ExperimentLogger : MonoBehaviour
     private static readonly string[] NpcIds = { "NPC001", "NPC002", "NPC003", "NPC004", "NPC005", "NPC006" };
     private static readonly string[] ClueIds = { "place", "time", "person", "feature" };
 
-    // ビルドでは.exeの隣、エディタではプロジェクトのルート（README 6.2）
+    // ビルドでは.exeの隣、エディタではAssetsの中（README 6.2）
     public static string LogDirectory =>
-        Path.Combine(Directory.GetParent(Application.dataPath).FullName, "ExperimentLogs");
+        Application.isEditor
+            ? Path.Combine(Application.dataPath, "ExperimentLogs")
+            : Path.Combine(Directory.GetParent(Application.dataPath).FullName, "ExperimentLogs");
 
     private StreamWriter writer;
     private bool sessionEnded;
