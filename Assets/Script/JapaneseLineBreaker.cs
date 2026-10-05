@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text;
+using TMPro;
 using UnityEngine;
 
 // 会話の本文を文節で区切り、文節の途中で改行されないようにする（README 3.10）
@@ -8,6 +9,8 @@ public static class JapaneseLineBreaker
 {
     private const string ModelPath = "BudouX/ja";
     private const char ZeroWidthSpace = '​';
+    private const string SentenceEnders = "。！？!?";
+    private const string ClosingBrackets = "」』）)";
 
     private static Dictionary<string, Dictionary<string, int>> model;
     private static double baseScore;
@@ -54,6 +57,63 @@ public static class JapaneseLineBreaker
         AppendPhrases(result, plain);
 
         return result.ToString();
+    }
+
+    // 上のFormatに加えて、targetに並べてmaxLines行以内に収まるときだけ文の終わり（。！？）の後で改行する
+    // 候補は前から順に試し、収まらない候補は飛ばす。行数を数えられないときは改行を足さない
+    public static string Format(string text, TMP_Text target, int maxLines)
+    {
+        if (string.IsNullOrEmpty(text) || target == null || maxLines <= 0)
+            return Format(text);
+
+        if (target.GetTextInfo(Format(text)).lineCount == 0)
+            return Format(text);
+
+        int i = 0;
+        while (i < text.Length)
+        {
+            char c = text[i];
+
+            // TMPのタグの中は候補にしない
+            if (c == '<')
+            {
+                int end = text.IndexOf('>', i);
+                if (end > i)
+                {
+                    i = end + 1;
+                    continue;
+                }
+            }
+
+            if (SentenceEnders.IndexOf(c) < 0)
+            {
+                i++;
+                continue;
+            }
+
+            int breakAt = i;
+            while (breakAt < text.Length && SentenceEnders.IndexOf(text[breakAt]) >= 0) breakAt++;
+            while (breakAt < text.Length && ClosingBrackets.IndexOf(text[breakAt]) >= 0) breakAt++;
+
+            // 本文の最後と、すでに改行があるところは候補にしない
+            if (breakAt >= text.Length)
+                break;
+            if (text[breakAt] == '\n' || text[breakAt] == '\r')
+            {
+                i = breakAt;
+                continue;
+            }
+
+            string candidate = text.Insert(breakAt, "\n");
+            if (target.GetTextInfo(Format(candidate)).lineCount <= maxLines)
+            {
+                text = candidate;
+                breakAt++;
+            }
+            i = breakAt;
+        }
+
+        return Format(text);
     }
 
     private static void AppendPhrases(StringBuilder result, StringBuilder plain)

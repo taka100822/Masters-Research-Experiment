@@ -23,6 +23,8 @@ public class DialogueManager : MonoBehaviour
     [SerializeField] private TMP_Text nameText;
     [SerializeField] private TMP_Text dialogueText;
     [SerializeField] private TMP_Text[] choiceTexts;
+    [Tooltip("本文が収まる行数。収まるときだけ文の終わりで改行する（README 3.10）")]
+    [SerializeField] private int maxDialogueLines = 3;
 
     // 会話UIの見た目（README 3.7）。未設定でも動く
     [Header("Dialogue UI Style")]
@@ -267,7 +269,7 @@ public class DialogueManager : MonoBehaviour
             return;
         }
 
-        dialogueText.text = JapaneseLineBreaker.Format(currentNode.text);
+        dialogueText.text = JapaneseLineBreaker.Format(currentNode.text, dialogueText, maxDialogueLines);
         nameText.text = currentNPC != null ? currentNPC.DisplayName : "";
 
         ExperimentLogger.Log("npc_line", npcId: CurrentNpcId, nodeId: currentNodeId, text: currentNode.text);
@@ -574,7 +576,7 @@ public class DialogueManager : MonoBehaviour
         dialoguePanel.SetActive(true);
         choicePanel.SetActive(false);
 
-        dialogueText.text = JapaneseLineBreaker.Format(reply);
+        dialogueText.text = JapaneseLineBreaker.Format(reply, dialogueText, maxDialogueLines);
 
         nextIndicator.SetActive(true);
         SetDialogueKeyGuide(currentNode.nextId < 0);
