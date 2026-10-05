@@ -667,6 +667,13 @@ public class DialogueManager : MonoBehaviour
         }
     }
 
+    // 設定パネルの「閉じる」ボタン（README 3.9）。Qで閉じたときと同じ処理
+    public void CloseSettingsFromButton()
+    {
+        if (currentState == GameState.InSettings)
+            CloseSettings();
+    }
+
     private void CloseSettings()
     {
         ExperimentLogger.Log("settings_close");

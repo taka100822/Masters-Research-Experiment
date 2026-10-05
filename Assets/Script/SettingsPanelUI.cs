@@ -19,6 +19,14 @@ public class SettingsPanelUI : MonoBehaviour
     [SerializeField] private Button titleButton;
     [SerializeField] private Button respawnButton;
 
+    // 「タイトルへ戻る」の確認と「閉じる」ボタン（README 3.9）。未設定なら確認なしですぐ戻る
+    [Header("確認・閉じる")]
+    [SerializeField] private GameObject actionGroup;
+    [SerializeField] private GameObject confirmGroup;
+    [SerializeField] private Button confirmTitleButton;
+    [SerializeField] private Button cancelTitleButton;
+    [SerializeField] private Button closeButton;
+
     public bool IsOpen => settingsPanel.activeSelf;
 
     private void Start()
@@ -30,10 +38,42 @@ public class SettingsPanelUI : MonoBehaviour
         sensitivitySlider.maxValue = LookSensitivitySettings.MaxSensitivity;
         sensitivitySlider.onValueChanged.AddListener(OnSensitivityChanged);
 
-        titleButton.onClick.AddListener(OnClickTitle);
         respawnButton.onClick.AddListener(OnClickRespawn);
 
+        if (confirmGroup != null && confirmTitleButton != null)
+        {
+            titleButton.onClick.AddListener(() => ShowTitleConfirm(true));
+            confirmTitleButton.onClick.AddListener(OnClickTitle);
+            if (cancelTitleButton != null)
+                cancelTitleButton.onClick.AddListener(() => ShowTitleConfirm(false));
+        }
+        else
+        {
+            titleButton.onClick.AddListener(OnClickTitle);
+        }
+
+        if (closeButton != null)
+            closeButton.onClick.AddListener(OnClickClose);
+
         settingsPanel.SetActive(false);
+    }
+
+    // ふだんのボタンの並びと確認を切り替える。確認中は「閉じる」を隠し、決定のボタンを1つにする（Qでは閉じられる）
+    private void ShowTitleConfirm(bool show)
+    {
+        if (confirmGroup != null)
+            confirmGroup.SetActive(show);
+        if (actionGroup != null)
+            actionGroup.SetActive(!show);
+        if (closeButton != null)
+            closeButton.gameObject.SetActive(!show);
+    }
+
+    private void OnClickClose()
+    {
+        var dialogueManager = FindAnyObjectByType<DialogueManager>();
+        if (dialogueManager != null)
+            dialogueManager.CloseSettingsFromButton();
     }
 
     public void Open()
@@ -49,11 +89,14 @@ public class SettingsPanelUI : MonoBehaviour
             sensitivitySlider.SetValueWithoutNotify(LookSensitivitySettings.Instance.Sensitivity);
 
         UpdateValueTexts();
+        ShowTitleConfirm(false);
         settingsPanel.SetActive(true);
     }
 
+    // 確認中に閉じたら確認は取り消す（次に開いたときはふだんの並びから）
     public void Close()
     {
+        ShowTitleConfirm(false);
         settingsPanel.SetActive(false);
     }
 
