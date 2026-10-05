@@ -18,7 +18,8 @@ public class TitleMenuUI : MonoBehaviour
     [SerializeField] private TMP_InputField participantIdInput;
     [SerializeField] private TMP_Dropdown conditionDropdown;   // 0: A, 1: B
     [SerializeField] private TMP_Dropdown questDropdown;       // 0: クエスト1, 1: クエスト2
-    [SerializeField] private Button closeButton;
+    [SerializeField] private Button closeButton;    // 「決定」：値を反映して閉じる
+    [SerializeField] private Button cancelButton;   // 「キャンセル」：値を変えずに閉じる（README 3.8）。未設定でも動く
     [SerializeField] private TMP_Text errorText;
     [SerializeField] private TMP_Text logPathText;   // ログの保存先（README 6.2）
 
@@ -35,6 +36,8 @@ public class TitleMenuUI : MonoBehaviour
         startButton.onClick.AddListener(OnClickStart);
         developerButton.onClick.AddListener(OpenDeveloperModal);
         closeButton.onClick.AddListener(CloseDeveloperModal);
+        if (cancelButton != null)
+            cancelButton.onClick.AddListener(CancelDeveloperModal);
 
         developerModal.SetActive(false);
         errorText.text = "";
@@ -82,6 +85,13 @@ public class TitleMenuUI : MonoBehaviour
         UpdateSummary();
     }
 
+    // 入力した値は捨てる。次に開いたときはExperimentConfigの値から入れ直す
+    private void CancelDeveloperModal()
+    {
+        developerModal.SetActive(false);
+        SetTitleContentVisible(true);
+    }
+
     private void SetTitleContentVisible(bool visible)
     {
         foreach (var go in hideWhileModalOpen)
@@ -89,12 +99,11 @@ public class TitleMenuUI : MonoBehaviour
                 go.SetActive(visible);
     }
 
+    // 実験者の確認用。参加者が条件を意識しないよう「条件」の語は出さない（README 3.8）
     private void UpdateSummary()
     {
         string condition = ExperimentConfig.Condition == DialogueCondition.B_ChoiceAndInput ? "B" : "A";
         settingsSummaryText.text =
-            "参加者 " + ExperimentConfig.ParticipantId +
-            " ／ 条件" + condition +
-            " ／ クエスト" + ExperimentConfig.QuestNumber;
+            ExperimentConfig.ParticipantId + "・" + condition + "・Q" + ExperimentConfig.QuestNumber;
     }
 }

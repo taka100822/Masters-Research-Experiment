@@ -24,6 +24,19 @@ public class DialogueManager : MonoBehaviour
     [SerializeField] private TMP_Text dialogueText;
     [SerializeField] private TMP_Text[] choiceTexts;
 
+    // 会話UIの見た目（README 3.7）。未設定でも動く
+    [Header("Dialogue UI Style")]
+    [SerializeField] private TMP_Text keyGuideText;
+    [SerializeField] private TMP_Text talkHintText;
+    [SerializeField] private TMP_Text inputHeaderText;
+    [SerializeField] private UnityEngine.UI.Image[] choiceRows;
+    [SerializeField] private UnityEngine.UI.Button sendButton;
+
+    private static readonly Color ChoiceSelectedColor = new Color32(0xF6, 0xEE, 0xDC, 0xFF);   // 漆喰
+    private static readonly Color ChoiceNormalColor = new Color32(0xB9, 0xA8, 0x8E, 0xFF);     // 煤
+    private static readonly Color ChoiceRowSelectedColor = new Color32(0xE0, 0xB3, 0x54, 0x40); // 真鍮25%
+    private const string KeyColor = "#E0B354";
+
     [Header("Player")]
     [SerializeField] private ThirdPersonController playerController;
 
@@ -76,6 +89,33 @@ public class DialogueManager : MonoBehaviour
 
         dialogueDatabase = FindAnyObjectByType<DialogueDatabase>();
         chatGPT = GameManager.Instance.GetComponent<ChatGPTClient>();
+
+        // 空欄（空白だけ）の間は送信できない（README 3.7）
+        inputField.onValueChanged.AddListener(_ => UpdateSendButton());
+    }
+
+    private void UpdateSendButton()
+    {
+        if (sendButton != null)
+            sendButton.interactable = !string.IsNullOrWhiteSpace(inputField.text);
+    }
+
+    // 操作案内（README 3.7）
+    private void SetKeyGuide(string text)
+    {
+        if (keyGuideText != null)
+            keyGuideText.text = text;
+    }
+
+    private static string Key(string key)
+    {
+        return "<color=" + KeyColor + ">[" + key + "]</color>";
+    }
+
+    // InDialogue（選択肢なし）のときの案内。次が無ければ「閉じる」
+    private void SetDialogueKeyGuide(bool isLast)
+    {
+        SetKeyGuide(Key("Enter") + " " + (isLast ? "閉じる" : "次へ"));
     }
 
     private void Update()
@@ -141,6 +181,9 @@ public class DialogueManager : MonoBehaviour
         }
 
         talkHint.SetActive(currentNPC != null);
+
+        if (currentNPC != null && talkHintText != null)
+            talkHintText.text = Key("Enter") + " " + currentNPC.DisplayName + "と話す";
 
         if (!TalkPressed() || currentNPC == null)
             return;
@@ -278,6 +321,7 @@ public class DialogueManager : MonoBehaviour
             // 選択肢から遷移してきた場合もInChoiceのままにしない（前の選択肢が再実行されるのを防ぐ）
             currentState = GameState.InDialogue;
             nextIndicator.SetActive(true);
+            SetDialogueKeyGuide(currentNode.nextId < 0);
         }
     }
 
@@ -337,21 +381,37 @@ public class DialogueManager : MonoBehaviour
         choicePanel.SetActive(true);
         UpdateChoiceUI();
 
+        SetKeyGuide(Key("↑") + Key("↓") + " 選ぶ　" + Key("Enter") + " 決定");
+
         StopPlayer();
     }
 
+    // 選択中の行は▶＋真鍮の下地、使わない行は隠す（README 3.7）
     private void UpdateChoiceUI()
     {
         for (int i = 0; i < choiceTexts.Length; i++)
         {
-            if (i < choices.Count)
+            bool used = i < choices.Count;
+            bool selected = used && i == choiceIndex;
+
+            if (used)
             {
-                choiceTexts[i].text = choices[i].text;
-                choiceTexts[i].color = (i == choiceIndex) ? Color.yellow : Color.white;
+                // 選ばれていない行も▶の幅をあけて、文の頭をそろえる
+                string cursor = selected
+                    ? "<color=" + KeyColor + ">▶</color> "
+                    : "<alpha=#00>▶<alpha=#FF> ";
+                choiceTexts[i].text = cursor + choices[i].text;
+                choiceTexts[i].color = selected ? ChoiceSelectedColor : ChoiceNormalColor;
             }
             else
             {
                 choiceTexts[i].text = "";
+            }
+
+            if (choiceRows != null && i < choiceRows.Length && choiceRows[i] != null)
+            {
+                choiceRows[i].gameObject.SetActive(used);
+                choiceRows[i].color = selected ? ChoiceRowSelectedColor : Color.clear;
             }
         }
     }
@@ -399,6 +459,30 @@ public class DialogueManager : MonoBehaviour
         // 前回送れなかった文章があれば残しておき、そのまま送り直せるようにする（README 4.6）
         inputField.text = lastFailedInput ?? "";
         inputField.ActivateInputField();
+        UpdateSendButton();
+
+        if (inputHeaderText != null)
+            inputHeaderText.text = (currentNPC != null ? currentNPC.DisplayName : "") + "に話しかける";
+
+        SetKeyGuide("入力したら「送信」を押してください");
+    }
+
+    // 「やめる」ボタン（README 3.7）。書きかけの文章は捨て、同じノードの選択肢に戻る
+    public void OnClickCancelInput()
+    {
+        if (currentState != GameState.InTyping)
+            return;
+
+        ExperimentLogger.Log("free_input_cancel", npcId: CurrentNpcId, nodeId: currentNodeId);
+
+        inputPanel.SetActive(false);
+        inputField.text = "";
+        lastFailedInput = null;
+
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
+        ShowChoicesFromNode();
     }
 
     private void HandleTypingInput()
@@ -438,6 +522,7 @@ public class DialogueManager : MonoBehaviour
         dialoguePanel.SetActive(true);
         nextIndicator.SetActive(false);
         dialogueText.text = WaitingText;
+        SetKeyGuide("返事を待っています…");
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var result = await chatGPT.SendChatMessage(
@@ -492,6 +577,7 @@ public class DialogueManager : MonoBehaviour
         dialogueText.text = reply;
 
         nextIndicator.SetActive(true);
+        SetDialogueKeyGuide(currentNode.nextId < 0);
     }
 
     // =========================
