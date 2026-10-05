@@ -267,7 +267,7 @@ public class DialogueManager : MonoBehaviour
             return;
         }
 
-        dialogueText.text = currentNode.text;
+        dialogueText.text = JapaneseLineBreaker.Format(currentNode.text);
         nameText.text = currentNPC != null ? currentNPC.DisplayName : "";
 
         ExperimentLogger.Log("npc_line", npcId: CurrentNpcId, nodeId: currentNodeId, text: currentNode.text);
@@ -574,7 +574,7 @@ public class DialogueManager : MonoBehaviour
         dialoguePanel.SetActive(true);
         choicePanel.SetActive(false);
 
-        dialogueText.text = reply;
+        dialogueText.text = JapaneseLineBreaker.Format(reply);
 
         nextIndicator.SetActive(true);
         SetDialogueKeyGuide(currentNode.nextId < 0);

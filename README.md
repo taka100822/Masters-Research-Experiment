@@ -512,6 +512,53 @@ Canvas（Screen Space Overlay）
 * `DialogueManager.CloseSettingsFromButton()`：`InSettings`のときだけ`CloseSettings()`を呼ぶ（`Q`と同じ処理・同じ`settings_close`ログ）
 * `MainScene.unity`：`SettingsPanel`の下に`Backdrop`・`Bg`・`ActionGroup`（`RespawnButton`・`TitleButton`・`CaptionText`）・`ConfirmGroup`（`MessageText`・`CancelTitleButton`・`ConfirmTitleButton`）・`CloseButton`。以前の「Q：閉じる」（`HintText`）は非表示
 
+## 3.10 会話の本文の改行（承認・実装済み）
+
+10.1 Phase 9「UI調整」の一部（2026-10-05 実装）。
+
+### 問題（2026-10-05）
+
+会話の本文（`DialogueText`）の改行位置がばらばらで読みにくい。TextMeshProは日本語を**1文字ごとにどこでも**折り返す（句読点の行頭禁止だけは守る）ので、窓の右端に来た文字で機械的に改行され、単語の途中で切れる。
+
+```text
+村に届く荷物は、いつも村の入り口に置かれるんだ。薬草の包
+みもきっとあそこに置かれたはずだよ。
+```
+
+CSVのセリフに手で改行を入れても、AIの返答（条件B）は長さも内容も毎回違うので直せない。
+
+### 方針：文節で折り返す
+
+* 本文を**文節**（「薬草の」「包みも」「きっと」…）に区切り、**文節の途中では改行しない**ようにする。改行は文節と文節の間だけで起きる
+* 区切りは**BudouX**（Googleの日本語改行用ライブラリ。Chromeの`word-break: auto-phrase`にも使われている。Apache 2.0）の日本語モデルを使う。辞書を持たない小さな学習済みモデル（JSON 1つ）で、C#に移すのは数十行
+* CSVのセリフにもAIの返答にも、**表示の直前に同じ処理**をかける。会話データ・プロンプトは書き換えない
+
+```text
+村に届く荷物は、いつも村の入り口に置かれるんだ。薬草の
+包みもきっとあそこに置かれたはずだよ。
+```
+
+**しくみ**：文節ごとに`<nobr>…</nobr>`（TMPの改行禁止タグ）で囲み、文節の間に幅ゼロの空白（U+200B）を入れて改行してよい位置にする。1つの文節が1行より長いとき（ほぼない）は、TMPがふつうに途中で折り返す。
+
+* 対象：NPCのセリフ（`ShowNode`）とAIの返答（`ShowAIResponse`）。選択肢・名前・操作案内は短いので変えない
+* `<`などTMPのタグと紛らわしい文字がAIの返答に入っていても壊れないよう、元の文のタグはそのまま残し、タグの中は区切らない
+* 手で入れた改行（CSVの`\n`など）はそのまま残す
+
+### 研究への影響（1.6）
+
+| 変更 | 影響 | 判断 |
+|---|---|---|
+| 本文の改行位置 | 見た目だけ。両条件・両クエストで同じ処理。文の中身は変わらない | 問題なし。2026-10-05 承認 |
+| ログ | `npc_line`・`ai_response`には**区切る前の元の文**を書く（タグを混ぜない）。ログ項目は変えない | 問題なし |
+
+### 実装の構成
+
+* `Assets/Resources/BudouX/ja.json`：BudouXの日本語モデル（GitHub `google/budoux`から取得。ライセンス表記を同じフォルダに置く）
+* `JapaneseLineBreaker`（新規・静的クラス）：`Format(string text)`で文節ごとに`<nobr>`で囲んだ文を返す。モデルは最初の1回だけ読む。読めなければ元の文をそのまま返す（今と同じ表示）
+* `DialogueManager`：`dialogueText.text = ...`の2か所（`ShowNode`・`ShowAIResponse`）で`JapaneseLineBreaker.Format`を通す
+* 確認（2026-10-05、Unity上で会話窓と同じ幅888px・24pxのTMPに表示）：会話データの全56行のうち折り返す12行すべてで、改行は文節の間だけで起きた（文節の途中での改行0件、行数は増えず最大2行）。`NotoSansJP-Regular SDF`はU+200Bを持つので□にならない
+* BudouXの区切りが辞書の単語と合わないことはある（例：「すれ違った」が「すれ／違った」に分かれる）。そのときもその区切りの間で改行されるだけで、1文字ずつの折り返しよりは読みやすい
+
 ---
 
 # 4. 会話システム
@@ -1129,6 +1176,7 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 | `NPCInteraction` | 近づいたかの判定、頭上の名前・吹き出し、依頼人の色分け |
 | `Billboard` | 頭上UIを常にカメラへ向ける |
 | `UIBob` | 会話送りの▼を上下に揺らす（3.7） |
+| `JapaneseLineBreaker`（static） | 会話の本文を文節で区切り、文節の途中で改行されないようにする（BudouXの日本語モデル、3.10） |
 | `ChatGPTClient` | OpenAI APIとの通信。結果は`ChatResult`（成功／失敗と理由）で返す |
 | `PromptData`（ScriptableObject） | NPCのシステムプロンプト |
 | `QuestData`（ScriptableObject） | クエスト1件分のデータ |
