@@ -572,6 +572,7 @@ MonoBehaviour:
   - {fileID: 448356800}
   - {fileID: 88788983}
   - {fileID: 1597898191}
+  maxDialogueLines: 3
   keyGuideText: {fileID: 1739434657}
   talkHintText: {fileID: 2102545286}
   inputHeaderText: {fileID: 597591912}
