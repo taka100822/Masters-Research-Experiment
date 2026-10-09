@@ -1,7 +1,7 @@
 using UnityEngine;
 using TMPro;
 
-// 画面右上のクエスト進行チェックリスト（README 3.5）
+// 画面右上のクエスト進行チェックリスト（クエスト版。今は使っていない。README 1.7）
 public class QuestPanelUI : MonoBehaviour
 {
     [SerializeField] private GameObject questPanel;

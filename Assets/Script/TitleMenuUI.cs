@@ -17,9 +17,9 @@ public class TitleMenuUI : MonoBehaviour
     [SerializeField] private GameObject developerModal;
     [SerializeField] private TMP_InputField participantIdInput;
     [SerializeField] private TMP_Dropdown conditionDropdown;   // 0: A, 1: B
-    [SerializeField] private TMP_Dropdown questDropdown;       // 0: セット1, 1: セット2（README 11.8）
+    [SerializeField] private TMP_Dropdown questDropdown;       // 0: セット1, 1: セット2（README 3.1）
     [SerializeField] private Button closeButton;    // 「決定」：値を反映して閉じる
-    [SerializeField] private Button cancelButton;   // 「キャンセル」：値を変えずに閉じる（README 3.8）。未設定でも動く
+    [SerializeField] private Button cancelButton;   // 「キャンセル」：値を変えずに閉じる（README 3.1）。未設定でも動く
     [SerializeField] private TMP_Text errorText;
     [SerializeField] private TMP_Text logPathText;   // ログの保存先（README 6.2）
 
@@ -99,7 +99,7 @@ public class TitleMenuUI : MonoBehaviour
                 go.SetActive(visible);
     }
 
-    // 実験者の確認用。参加者が条件を意識しないよう「条件」の語は出さない（README 3.8）
+    // 実験者の確認用。参加者が条件を意識しないよう「条件」の語は出さない（README 3.1）
     private void UpdateSummary()
     {
         string condition = ExperimentConfig.Condition == DialogueCondition.B_ChoiceAndInput ? "B" : "A";

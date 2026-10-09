@@ -16,9 +16,9 @@ public class DialogueManager : MonoBehaviour
     [SerializeField] private GameObject choicePanel;
     [SerializeField] private GameObject inputPanel;
     [SerializeField] private TMP_InputField inputField;
-    [Tooltip("終了画面（README 11.2）")]
+    [Tooltip("終了画面（README 3.7）")]
     [SerializeField] private GameObject questCompletePanel;
-    [Tooltip("探索前の説明画面（README 11.2）。未設定ならすぐに探索を始める")]
+    [Tooltip("探索前の説明画面（README 3.7）。未設定ならすぐに探索を始める")]
     [SerializeField] private GameObject introPanel;
     [SerializeField] private SettingsPanelUI settingsPanel;
 
@@ -26,10 +26,10 @@ public class DialogueManager : MonoBehaviour
     [SerializeField] private TMP_Text nameText;
     [SerializeField] private TMP_Text dialogueText;
     [SerializeField] private TMP_Text[] choiceTexts;
-    [Tooltip("本文が収まる行数。収まるときだけ文の終わりで改行する（README 3.10）")]
+    [Tooltip("本文が収まる行数。収まるときだけ文の終わりで改行する（README 3.4）")]
     [SerializeField] private int maxDialogueLines = 3;
 
-    // 会話UIの見た目（README 3.7）。未設定でも動く
+    // 会話UIの見た目（README 3.3）。未設定でも動く
     [Header("Dialogue UI Style")]
     [SerializeField] private TMP_Text keyGuideText;
     [SerializeField] private TMP_Text talkHintText;
@@ -95,13 +95,13 @@ public class DialogueManager : MonoBehaviour
         dialogueDatabase = FindAnyObjectByType<DialogueDatabase>();
         chatGPT = GameManager.Instance.GetComponent<ChatGPTClient>();
 
-        // 空欄（空白だけ）の間は送信できない（README 3.7）
+        // 空欄（空白だけ）の間は送信できない（README 3.3）
         inputField.onValueChanged.AddListener(_ => UpdateSendButton());
 
         if (ExplorationTimer.Instance != null)
             ExplorationTimer.Instance.OnTimeUp += HandleTimeUp;
 
-        // 説明画面を閉じるまでは動けない。閉じたら5分を数え始める（README 11.2）
+        // 説明画面を閉じるまでは動けない。閉じたら5分を数え始める（README 3.7）
         if (introPanel != null)
         {
             currentState = GameState.Intro;
@@ -121,7 +121,7 @@ public class DialogueManager : MonoBehaviour
     }
 
     // =========================
-    // 説明画面と制限時間（README 11.2・11.4）
+    // 説明画面と制限時間（README 3.7・5.1）
     // =========================
 
     private static bool IsTimeUp => ExplorationTimer.Instance != null && ExplorationTimer.Instance.IsTimeUp;
@@ -145,7 +145,7 @@ public class DialogueManager : MonoBehaviour
             ExplorationTimer.Instance.Begin();
     }
 
-    // 途中で切らず、今のやりとりの区切りで終了画面にする。探索中ならすぐ（README 11.4）
+    // 途中で切らず、今のやりとりの区切りで終了画面にする。探索中ならすぐ（README 5.1）
     private void HandleTimeUp()
     {
         ExperimentLogger.Log("time_up", detail: "state=" + currentState);
@@ -160,7 +160,7 @@ public class DialogueManager : MonoBehaviour
             sendButton.interactable = !string.IsNullOrWhiteSpace(inputField.text);
     }
 
-    // 操作案内（README 3.7）
+    // 操作案内（README 3.3）
     private void SetKeyGuide(string text)
     {
         if (keyGuideText != null)
@@ -261,13 +261,13 @@ public class DialogueManager : MonoBehaviour
             return;
         }
 
-        // 会話はいつも0から始まる（README 11.5）
+        // 会話はいつも0から始まる（README 5.3）
         StartNode(0);
     }
 
     private static int TopicSet => ExperimentSettings.Instance != null ? ExperimentSettings.Instance.topicSet : 1;
 
-    // Dialogue/S{話題セット番号}/ から読む（README 11.6）
+    // Dialogue/S{話題セット番号}/ から読む（README 4.4）
     private bool LoadDialogueCSV(string csvFileName)
     {
         return dialogueDatabase.LoadCSV("Dialogue/S" + TopicSet + "/" + csvFileName);
@@ -390,7 +390,7 @@ public class DialogueManager : MonoBehaviour
         ShowNode();
     }
 
-    // CSVのaction列。topic:<番号>で話題を聞いたことを記録する（README 11.5）
+    // CSVのaction列。topic:<番号>で話題を聞いたことを記録する（README 5.3）
     private void ExecuteNodeAction(string action)
     {
         if (string.IsNullOrEmpty(action))
@@ -422,7 +422,7 @@ public class DialogueManager : MonoBehaviour
         StopPlayer();
     }
 
-    // 選択中の行は▶＋真鍮の下地、使わない行は隠す（README 3.7）
+    // 選択中の行は▶＋真鍮の下地、使わない行は隠す（README 3.3）
     private void UpdateChoiceUI()
     {
         for (int i = 0; i < choiceTexts.Length; i++)
@@ -475,7 +475,7 @@ public class DialogueManager : MonoBehaviour
             ExperimentLogger.Log("choice_select", npcId: CurrentNpcId, nodeId: currentNodeId,
                 text: choices[choiceIndex].text, choiceIndex: choiceIndex);
 
-            // 時間切れのあとは選んだ先へ進まない（README 11.4）
+            // 時間切れのあとは選んだ先へ進まない（README 5.1）
             if (IsTimeUp)
             {
                 CloseDialogue();
@@ -510,7 +510,7 @@ public class DialogueManager : MonoBehaviour
         SetKeyGuide("入力したら「送信」を押してください");
     }
 
-    // 「やめる」ボタン（README 3.7）。書きかけの文章は捨て、同じノードの選択肢に戻る
+    // 「やめる」ボタン（README 3.3）。書きかけの文章は捨て、同じノードの選択肢に戻る
     public void OnClickCancelInput()
     {
         if (currentState != GameState.InTyping)
@@ -592,7 +592,7 @@ public class DialogueManager : MonoBehaviour
         ShowAIResponse(shown);
     }
 
-    // PromptData/S{話題セット番号}/ → NPCDialogue.promptData の順で探す（README 11.6）
+    // PromptData/S{話題セット番号}/ → NPCDialogue.promptData の順で探す（README 4.5）
     // pathには見つかった場所（ログ用。例：S1/NPC005）が入る
     private PromptData LoadPromptData(NPCDialogue npc, out string path)
     {
@@ -641,7 +641,7 @@ public class DialogueManager : MonoBehaviour
 
         playerController.enabled = true;
 
-        // 時間切れのあとに会話を閉じたら終了画面へ（README 11.4）
+        // 時間切れのあとに会話を閉じたら終了画面へ（README 5.1）
         if (IsTimeUp)
             EndGame();
     }
@@ -680,7 +680,7 @@ public class DialogueManager : MonoBehaviour
     }
 
     // =========================
-    // Settings（README 3.6）
+    // Settings（README 3.8）
     // =========================
 
     private void OpenSettings()
@@ -704,7 +704,7 @@ public class DialogueManager : MonoBehaviour
         }
     }
 
-    // 設定パネルの「閉じる」ボタン（README 3.9）。Qで閉じたときと同じ処理
+    // 設定パネルの「閉じる」ボタン（README 3.8）。Qで閉じたときと同じ処理
     public void CloseSettingsFromButton()
     {
         if (currentState == GameState.InSettings)
@@ -724,7 +724,7 @@ public class DialogueManager : MonoBehaviour
         currentState = GameState.FreeMove;
     }
 
-    // 設定パネルの「初期位置に戻る」（README 3.6）。クエストの進み具合はそのまま
+    // 設定パネルの「初期位置に戻る」（README 3.8）。残り時間はそのまま
     public void RespawnPlayer()
     {
         var player = playerController.transform;

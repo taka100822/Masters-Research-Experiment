@@ -3,7 +3,7 @@ using System.Text;
 using TMPro;
 using UnityEngine;
 
-// 会話の本文を文節で区切り、文節の途中で改行されないようにする（README 3.10）
+// 会話の本文を文節で区切り、文節の途中で改行されないようにする（README 3.4）
 // 区切りはBudouXの日本語モデル（Resources/BudouX/ja.json、Apache 2.0）を使う
 public static class JapaneseLineBreaker
 {

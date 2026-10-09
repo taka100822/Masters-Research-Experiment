@@ -3,7 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using UnityEngine.SceneManagement;
 
-// 設定パネルの表示とスライダー・ボタンの処理（README 3.6）
+// 設定パネルの表示とスライダー・ボタンの処理（README 3.8）
 // 開閉のタイミング（Qキー・状態遷移）はDialogueManagerが管理する
 public class SettingsPanelUI : MonoBehaviour
 {
@@ -19,7 +19,7 @@ public class SettingsPanelUI : MonoBehaviour
     [SerializeField] private Button titleButton;
     [SerializeField] private Button respawnButton;
 
-    // 「タイトルへ戻る」の確認と「閉じる」ボタン（README 3.9）。未設定なら確認なしですぐ戻る
+    // 「タイトルへ戻る」の確認と「閉じる」ボタン（README 3.8）。未設定なら確認なしですぐ戻る
     [Header("確認・閉じる")]
     [SerializeField] private GameObject actionGroup;
     [SerializeField] private GameObject confirmGroup;

@@ -18,7 +18,7 @@ public class ExperimentSettings : MonoBehaviour
     [Header("対話条件（A: 選択肢のみ / B: 選択肢＋自由入力）")]
     public DialogueCondition condition = DialogueCondition.A_ChoiceOnly;
 
-    [Header("話題セット（1 / 2）（README 11.3）")]
+    [Header("話題セット（1 / 2）（README 1.3）")]
     [Range(1, 2)]
     [FormerlySerializedAs("questNumber")]
     public int topicSet = 1;

@@ -18,7 +18,7 @@ public class DialogueDatabase : MonoBehaviour
 
         public int allowInput;
 
-        // startQuest / clue:<clueId> / complete / 空（README 4.4）
+        // topic:<番号> / 空（README 4.4）
         public string action;
     }
 

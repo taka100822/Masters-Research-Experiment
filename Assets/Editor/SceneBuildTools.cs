@@ -2,7 +2,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
-// MainSceneの作り直し用ツール（README 3.4・7.6）
+// MainSceneの作り直し用ツール（README 3.6・7.6）
 // メニュー「Tools/研究用」から実行する。Play中は実行できない
 public static class SceneBuildTools
 {
@@ -109,7 +109,7 @@ public static class SceneBuildTools
     }
 
     // =========================
-    // ミニマップの地図（README 3.4）
+    // ミニマップの地図（README 3.6）
     // =========================
 
     private const string MinimapImagePath = "Assets/Texture/minimap_village.png";

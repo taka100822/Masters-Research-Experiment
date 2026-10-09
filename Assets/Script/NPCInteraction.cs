@@ -7,10 +7,10 @@ public class NPCInteraction : MonoBehaviour
 {
     [SerializeField] private GameObject bubbleUI;
 
-    [Tooltip("頭上に常に表示する名前（README 3.3）")]
+    [Tooltip("頭上に常に表示する名前（README 3.5）")]
     [SerializeField] private TMP_Text nameLabel;
 
-    [Tooltip("今のクエストの依頼人のときの吹き出しと名前の色（README 3.3）")]
+    [Tooltip("クエスト版の依頼人の吹き出しと名前の色。今は依頼人がいないので使わない（README 3.5）")]
     [FormerlySerializedAs("clientBubbleColor")]
     [SerializeField] private Color clientColor = new Color(1f, 0.82f, 0.2f, 1f);
 

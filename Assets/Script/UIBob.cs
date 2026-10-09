@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// UIを上下にゆっくり揺らす。会話送りの▼に使う（README 3.7）
+// UIを上下にゆっくり揺らす。会話送りの▼に使う（README 3.3）
 [RequireComponent(typeof(RectTransform))]
 public class UIBob : MonoBehaviour
 {

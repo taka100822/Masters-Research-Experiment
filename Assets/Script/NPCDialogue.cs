@@ -2,13 +2,13 @@ using UnityEngine;
 
 public class NPCDialogue : MonoBehaviour
 {
-    [Tooltip("ログ・CSV用の固定ID（NPC001など）。話題セットが変わっても同じ（位置の番号。README 11.6）")]
+    [Tooltip("ログ・CSV用の固定ID（NPC001など）。話題セットが変わっても同じ（位置の番号。README 5.2）")]
     public string npcId;
 
     [Tooltip("会話ウィンドウに表示する名前（話題セット1）。空ならnpcIdを表示")]
     public string displayName;
 
-    [Header("話題セット2（README 11.6）")]
+    [Header("話題セット2（README 5.2）")]
     [Tooltip("話題セット2のときの名前。空ならdisplayNameのまま")]
     public string set2DisplayName;
 

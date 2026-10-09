@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using TMPro;
 
-// 探索の制限時間（README 11.4）
+// 探索の制限時間（README 5.1）
 // 説明画面を閉じたとき（Begin）から数え始める。ゲーム内の時間で数えるので、設定パネル表示中（timeScale=0）は止まる
 public class ExplorationTimer : MonoBehaviour
 {
