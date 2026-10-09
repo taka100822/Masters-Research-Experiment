@@ -7,13 +7,13 @@ public static class ExperimentConfig
 
     public static string ParticipantId { get; private set; } = "P000";
     public static DialogueCondition Condition { get; private set; } = DialogueCondition.A_ChoiceOnly;
-    public static int QuestNumber { get; private set; } = 1;
+    public static int TopicSet { get; private set; } = 1;
 
-    public static void Set(string participantId, DialogueCondition condition, int questNumber)
+    public static void Set(string participantId, DialogueCondition condition, int topicSet)
     {
         ParticipantId = participantId;
         Condition = condition;
-        QuestNumber = questNumber;
+        TopicSet = topicSet;
         HasValue = true;
     }
 }

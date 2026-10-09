@@ -16,7 +16,10 @@ public class DialogueManager : MonoBehaviour
     [SerializeField] private GameObject choicePanel;
     [SerializeField] private GameObject inputPanel;
     [SerializeField] private TMP_InputField inputField;
+    [Tooltip("終了画面（README 11.2）")]
     [SerializeField] private GameObject questCompletePanel;
+    [Tooltip("探索前の説明画面（README 11.2）。未設定ならすぐに探索を始める")]
+    [SerializeField] private GameObject introPanel;
     [SerializeField] private SettingsPanelUI settingsPanel;
 
     [Header("Text")]
@@ -94,6 +97,61 @@ public class DialogueManager : MonoBehaviour
 
         // 空欄（空白だけ）の間は送信できない（README 3.7）
         inputField.onValueChanged.AddListener(_ => UpdateSendButton());
+
+        if (ExplorationTimer.Instance != null)
+            ExplorationTimer.Instance.OnTimeUp += HandleTimeUp;
+
+        // 説明画面を閉じるまでは動けない。閉じたら5分を数え始める（README 11.2）
+        if (introPanel != null)
+        {
+            currentState = GameState.Intro;
+            introPanel.SetActive(true);
+            StopPlayer();
+        }
+        else
+        {
+            BeginExploration();
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (ExplorationTimer.Instance != null)
+            ExplorationTimer.Instance.OnTimeUp -= HandleTimeUp;
+    }
+
+    // =========================
+    // 説明画面と制限時間（README 11.2・11.4）
+    // =========================
+
+    private static bool IsTimeUp => ExplorationTimer.Instance != null && ExplorationTimer.Instance.IsTimeUp;
+
+    private void HandleIntroInput()
+    {
+        if (!Keyboard.current.enterKey.wasPressedThisFrame)
+            return;
+
+        introPanel.SetActive(false);
+        ResetPlayerInputs();
+        playerController.enabled = true;
+        currentState = GameState.FreeMove;
+
+        BeginExploration();
+    }
+
+    private void BeginExploration()
+    {
+        if (ExplorationTimer.Instance != null)
+            ExplorationTimer.Instance.Begin();
+    }
+
+    // 途中で切らず、今のやりとりの区切りで終了画面にする。探索中ならすぐ（README 11.4）
+    private void HandleTimeUp()
+    {
+        ExperimentLogger.Log("time_up", detail: "state=" + currentState);
+
+        if (currentState == GameState.FreeMove)
+            EndGame();
     }
 
     private void UpdateSendButton()
@@ -143,6 +201,10 @@ public class DialogueManager : MonoBehaviour
             case GameState.InSettings:
                 HandleSettingsInput();
                 break;
+
+            case GameState.Intro:
+                HandleIntroInput();
+                break;
         }
     }
 
@@ -175,6 +237,9 @@ public class DialogueManager : MonoBehaviour
 
     private void HandleFreeMoveInput()
     {
+        if (IsTimeUp)
+            return;
+
         // 設定パネルは探索中だけ開ける（自由入力中の「q」で開かないように）
         if (Keyboard.current.qKey.wasPressedThisFrame && settingsPanel != null)
         {
@@ -196,49 +261,16 @@ public class DialogueManager : MonoBehaviour
             return;
         }
 
-        StartNode(SelectStartNode());
+        // 会話はいつも0から始まる（README 11.5）
+        StartNode(0);
     }
 
-    // Dialogue/Q{クエスト番号}/ → Dialogue/Common/ の順で探す（README 4.4）
+    private static int TopicSet => ExperimentSettings.Instance != null ? ExperimentSettings.Instance.topicSet : 1;
+
+    // Dialogue/S{話題セット番号}/ から読む（README 11.6）
     private bool LoadDialogueCSV(string csvFileName)
     {
-        int questNumber = ExperimentSettings.Instance != null
-            ? ExperimentSettings.Instance.questNumber
-            : 1;
-
-        return dialogueDatabase.LoadCSV("Dialogue/Q" + questNumber + "/" + csvFileName)
-            || dialogueDatabase.LoadCSV("Dialogue/Common/" + csvFileName);
-    }
-
-    // クエスト状態ごとの開始ノード。無ければ後ろの候補へ（README 4.4）
-    private int SelectStartNode()
-    {
-        int[] candidates = new[] { 0 };
-
-        var quest = QuestManager.Instance;
-        if (quest != null)
-        {
-            switch (quest.State)
-            {
-                case QuestState.InProgress:
-                    candidates = quest.HasAllClues()
-                        ? new[] { 200, 100, 0 }
-                        : new[] { 100, 0 };
-                    break;
-
-                case QuestState.Completed:
-                    candidates = new[] { 300, 0 };
-                    break;
-            }
-        }
-
-        foreach (int id in candidates)
-        {
-            if (dialogueDatabase.HasNode(id))
-                return id;
-        }
-
-        return 0;
+        return dialogueDatabase.LoadCSV("Dialogue/S" + TopicSet + "/" + csvFileName);
     }
 
     private void StartNode(int id)
@@ -253,8 +285,7 @@ public class DialogueManager : MonoBehaviour
 
         StopPlayer();
 
-        ExperimentLogger.Log("dialogue_start", npcId: CurrentNpcId, nodeId: id,
-            detail: "quest_state=" + (QuestManager.Instance != null ? QuestManager.Instance.State.ToString() : "none"));
+        ExperimentLogger.Log("dialogue_start", npcId: CurrentNpcId, nodeId: id);
 
         ShowNode();
     }
@@ -332,6 +363,13 @@ public class DialogueManager : MonoBehaviour
         if (!DialogueNextPressed())
             return;
 
+        // 時間切れのあとは次のノードへ進まない
+        if (IsTimeUp)
+        {
+            CloseDialogue();
+            return;
+        }
+
         if (currentNode.nextId >= 0)
             GoToNode(currentNode.nextId);
         else
@@ -352,19 +390,15 @@ public class DialogueManager : MonoBehaviour
         ShowNode();
     }
 
-    // CSVのaction列をクエストに反映する（README 4.4）
+    // CSVのaction列。topic:<番号>で話題を聞いたことを記録する（README 11.5）
     private void ExecuteNodeAction(string action)
     {
-        var quest = QuestManager.Instance;
-        if (string.IsNullOrEmpty(action) || quest == null)
+        if (string.IsNullOrEmpty(action))
             return;
 
-        if (action == "startQuest")
-            quest.StartQuest();
-        else if (action.StartsWith("clue:"))
-            quest.AddClue(action.Substring("clue:".Length));
-        else if (action == "complete")
-            quest.Complete();
+        if (action.StartsWith("topic:"))
+            ExperimentLogger.Log("topic_heard", npcId: CurrentNpcId, nodeId: currentNodeId,
+                detail: "topic=" + action.Substring("topic:".Length));
         else
             Debug.LogWarning("Unknown node action: " + action);
     }
@@ -441,6 +475,13 @@ public class DialogueManager : MonoBehaviour
             ExperimentLogger.Log("choice_select", npcId: CurrentNpcId, nodeId: currentNodeId,
                 text: choices[choiceIndex].text, choiceIndex: choiceIndex);
 
+            // 時間切れのあとは選んだ先へ進まない（README 11.4）
+            if (IsTimeUp)
+            {
+                CloseDialogue();
+                return;
+            }
+
             choices[choiceIndex].onSelect?.Invoke();
         }
     }
@@ -483,6 +524,12 @@ public class DialogueManager : MonoBehaviour
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+
+        if (IsTimeUp)
+        {
+            CloseDialogue();
+            return;
+        }
 
         ShowChoicesFromNode();
     }
@@ -545,21 +592,12 @@ public class DialogueManager : MonoBehaviour
         ShowAIResponse(shown);
     }
 
-    // PromptData/Q{クエスト番号}/ → PromptData/Common/ → NPCDialogue.promptData の順で探す（README 4.5）
-    // pathには見つかった場所（ログ用。例：Q1/NPC005）が入る
+    // PromptData/S{話題セット番号}/ → NPCDialogue.promptData の順で探す（README 11.6）
+    // pathには見つかった場所（ログ用。例：S1/NPC005）が入る
     private PromptData LoadPromptData(NPCDialogue npc, out string path)
     {
-        int questNumber = ExperimentSettings.Instance != null
-            ? ExperimentSettings.Instance.questNumber
-            : 1;
-
-        path = "Q" + questNumber + "/" + npc.npcId;
+        path = "S" + TopicSet + "/" + npc.npcId;
         PromptData prompt = Resources.Load<PromptData>("PromptData/" + path);
-        if (prompt == null)
-        {
-            path = "Common/" + npc.npcId;
-            prompt = Resources.Load<PromptData>("PromptData/" + path);
-        }
         if (prompt == null)
         {
             path = "NPCDialogue/" + npc.npcId;
@@ -603,12 +641,9 @@ public class DialogueManager : MonoBehaviour
 
         playerController.enabled = true;
 
-        // 達成会話を閉じたら終了画面へ（README 3.5）
-        if (QuestManager.Instance != null &&
-            QuestManager.Instance.State == QuestState.Completed)
-        {
+        // 時間切れのあとに会話を閉じたら終了画面へ（README 11.4）
+        if (IsTimeUp)
             EndGame();
-        }
     }
 
     private void EndGame()
@@ -621,7 +656,7 @@ public class DialogueManager : MonoBehaviour
         if (questCompletePanel != null)
             questCompletePanel.SetActive(true);
 
-        ExperimentLogger.EndSessionNow("quest_complete");
+        ExperimentLogger.EndSessionNow("time_up");
     }
 
     // プレイヤーを止める。enabled=falseだけだと走りモーションと足音が続くため、速度も0にする

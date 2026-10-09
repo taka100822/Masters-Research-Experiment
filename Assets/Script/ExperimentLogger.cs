@@ -14,10 +14,9 @@ public class ExperimentLogger : MonoBehaviour
     public static ExperimentLogger Instance;
 
     private const string EventHeader =
-        "session_id,participant_id,condition,quest,timestamp,play_time,event_type,npc_id,node_id,text,player_input,choice_index,clue_id,duration,is_error,detail";
+        "session_id,participant_id,condition,set,timestamp,play_time,event_type,npc_id,node_id,text,player_input,choice_index,clue_id,duration,is_error,detail";
 
     private static readonly string[] NpcIds = { "NPC001", "NPC002", "NPC003", "NPC004", "NPC005", "NPC006" };
-    private static readonly string[] ClueIds = { "place", "time", "person", "feature" };
 
     // ビルドでは.exeの隣、エディタではAssetsの中（README 6.2）
     public static string LogDirectory =>
@@ -31,13 +30,14 @@ public class ExperimentLogger : MonoBehaviour
     private string sessionId;
     private string participantId;
     private string condition;
-    private int quest;
+    private int topicSet;
     private string startTime;
 
     // 集計（README 6.7）
     private int dialogueCount, choiceCount, freeInputCount, aiErrorCount, settingsOpenCount, respawnCount;
-    private float? questStartTime, questCompleteTime;
-    private readonly Dictionary<string, float> clueTimes = new();
+    private float? exploreStartTime, timeUpTime;
+    private float aiWaitSeconds;
+    private readonly HashSet<string> topicsHeard = new();   // "NPC001:1" の形。同じ話題は1つと数える
     private readonly Dictionary<string, int> talkCounts = new();
     private readonly Dictionary<string, float> talkSeconds = new();
     private readonly HashSet<string> talkedNpcs = new();
@@ -126,7 +126,7 @@ public class ExperimentLogger : MonoBehaviour
         var settings = ExperimentSettings.Instance;
         participantId = settings != null ? settings.participantId : "unknown";
         condition = settings != null && settings.condition == DialogueCondition.B_ChoiceAndInput ? "B" : "A";
-        quest = settings != null ? settings.questNumber : 0;
+        topicSet = settings != null ? settings.topicSet : 0;
 
         var now = DateTime.Now;
         startTime = now.ToString("yyyy-MM-ddTHH:mm:ss.fff", CultureInfo.InvariantCulture);
@@ -136,7 +136,7 @@ public class ExperimentLogger : MonoBehaviour
         try
         {
             Directory.CreateDirectory(LogDirectory);
-            string fileName = SafeFileName(participantId) + "_" + condition + "_Q" + quest + "_" + stamp + ".csv";
+            string fileName = SafeFileName(participantId) + "_" + condition + "_S" + topicSet + "_" + stamp + ".csv";
             string path = Path.Combine(LogDirectory, fileName);
 
             writer = new StreamWriter(path, false, new UTF8Encoding(true)) { AutoFlush = true };
@@ -205,7 +205,7 @@ public class ExperimentLogger : MonoBehaviour
             sessionId,
             participantId,
             condition,
-            quest.ToString(CultureInfo.InvariantCulture),
+            topicSet.ToString(CultureInfo.InvariantCulture),
             DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fff", CultureInfo.InvariantCulture),
             PlayTime.ToString("0.000", CultureInfo.InvariantCulture),
             eventType,
@@ -258,6 +258,7 @@ public class ExperimentLogger : MonoBehaviour
             case "ai_response":
                 if (isError)
                     aiErrorCount++;
+                aiWaitSeconds += ReadLatencySeconds(detail);
                 break;
 
             case "dialogue_end":
@@ -272,21 +273,18 @@ public class ExperimentLogger : MonoBehaviour
                 dialogueNpc = null;
                 break;
 
-            case "quest_start":
-                questStartTime = PlayTime;
+            case "explore_start":
+                exploreStartTime = PlayTime;
                 break;
 
-            case "clue_get":
-                if (clueId != null && !clueTimes.ContainsKey(clueId))
-                    clueTimes[clueId] = PlayTime;
+            case "topic_heard":
                 npcId ??= dialogueNpc;
-                detail = Append(detail, "clues_collected=" + clueTimes.Count + ";npcs_talked=" + talkedNpcs.Count);
+                topicsHeard.Add(npcId + ":" + ReadValue(detail, "topic"));
+                detail = Append(detail, "topics_heard=" + topicsHeard.Count + ";npcs_talked=" + talkedNpcs.Count);
                 break;
 
-            case "quest_complete":
-                questCompleteTime = PlayTime;
-                if (questStartTime.HasValue)
-                    duration = PlayTime - questStartTime.Value;
+            case "time_up":
+                timeUpTime = PlayTime;
                 break;
 
             case "settings_open":
@@ -331,22 +329,21 @@ public class ExperimentLogger : MonoBehaviour
     {
         var header = new List<string>
         {
-            "session_id", "participant_id", "condition", "quest", "start_time", "end_reason", "total_play_time",
-            "quest_start_time", "quest_complete_time", "quest_duration",
-            "dialogue_count", "choice_count", "free_input_count", "ai_error_count", "settings_open_count", "respawn_count"
+            "session_id", "participant_id", "condition", "set", "start_time", "end_reason", "total_play_time",
+            "explore_start_time", "time_up_time",
+            "dialogue_count", "choice_count", "free_input_count", "ai_error_count", "ai_wait_total",
+            "npcs_talked", "topics_heard", "settings_open_count", "respawn_count"
         };
-        foreach (var id in ClueIds) header.Add("clue_" + id + "_time");
         foreach (var id in NpcIds) header.Add("talk_" + id);
 
         var row = new List<string>
         {
-            sessionId, participantId, condition, quest.ToString(CultureInfo.InvariantCulture), startTime, reason,
-            F(PlayTime), F(questStartTime), F(questCompleteTime),
-            questStartTime.HasValue && questCompleteTime.HasValue ? F(questCompleteTime.Value - questStartTime.Value) : "",
-            dialogueCount.ToString(), choiceCount.ToString(), freeInputCount.ToString(), aiErrorCount.ToString(),
+            sessionId, participantId, condition, topicSet.ToString(CultureInfo.InvariantCulture), startTime, reason,
+            F(PlayTime), F(exploreStartTime), F(timeUpTime),
+            dialogueCount.ToString(), choiceCount.ToString(), freeInputCount.ToString(), aiErrorCount.ToString(), F(aiWaitSeconds),
+            talkedNpcs.Count.ToString(), topicsHeard.Count.ToString(),
             settingsOpenCount.ToString(), respawnCount.ToString()
         };
-        foreach (var id in ClueIds) row.Add(clueTimes.TryGetValue(id, out float t) ? F(t) : "");
         foreach (var id in NpcIds)
             row.Add(talkCounts.TryGetValue(id, out int n)
                 ? n + "/" + talkSeconds[id].ToString("0.0", CultureInfo.InvariantCulture)
@@ -355,10 +352,26 @@ public class ExperimentLogger : MonoBehaviour
         try
         {
             string path = Path.Combine(LogDirectory, "summary.csv");
+            string headerLine = ToCsvLine(header.ToArray());
+
+            // 列の違う古いsummary.csv（クエスト版など）があれば、別名で残して新しく作り直す
+            if (File.Exists(path))
+            {
+                string firstLine;
+                using (var sr = new StreamReader(path, Encoding.UTF8))
+                    firstLine = sr.ReadLine();
+                if (firstLine != headerLine)
+                {
+                    string old = Path.Combine(LogDirectory, "summary_old_" + DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) + ".csv");
+                    File.Move(path, old);
+                    Debug.Log("[Log] summary.csv had different columns. Moved to " + old);
+                }
+            }
+
             bool isNew = !File.Exists(path);
             using var sw = new StreamWriter(path, true, new UTF8Encoding(true));
             if (isNew)
-                sw.WriteLine(ToCsvLine(header.ToArray()));
+                sw.WriteLine(headerLine);
             sw.WriteLine(ToCsvLine(row.ToArray()));
         }
         catch (Exception e)
@@ -373,6 +386,25 @@ public class ExperimentLogger : MonoBehaviour
 
     private static string F(float? v) =>
         v.HasValue ? v.Value.ToString("0.000", CultureInfo.InvariantCulture) : "";
+
+    // detailの「key=value;…」からvalueを取り出す。無ければnull
+    private static string ReadValue(string detail, string key)
+    {
+        if (string.IsNullOrEmpty(detail))
+            return null;
+        foreach (var part in detail.Split(';'))
+            if (part.StartsWith(key + "="))
+                return part.Substring(key.Length + 1);
+        return null;
+    }
+
+    // ai_responseのlatency_ms（DialogueManagerが書く）を秒にする。プロンプトが無いときなどは0
+    private static float ReadLatencySeconds(string detail)
+    {
+        return long.TryParse(ReadValue(detail, "latency_ms"), NumberStyles.Integer, CultureInfo.InvariantCulture, out long ms)
+            ? ms / 1000f
+            : 0f;
+    }
 
     private static string Append(string detail, string more) =>
         string.IsNullOrEmpty(detail) ? more : detail + ";" + more;

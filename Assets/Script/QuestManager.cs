@@ -57,7 +57,7 @@ public class QuestManager : MonoBehaviour
             return;
 
         int questNumber = ExperimentSettings.Instance != null
-            ? ExperimentSettings.Instance.questNumber
+            ? ExperimentSettings.Instance.topicSet
             : 1;
 
         quest = Resources.Load<QuestData>("Quest/Q" + questNumber);

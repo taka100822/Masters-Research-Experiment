@@ -17,7 +17,7 @@ public class TitleMenuUI : MonoBehaviour
     [SerializeField] private GameObject developerModal;
     [SerializeField] private TMP_InputField participantIdInput;
     [SerializeField] private TMP_Dropdown conditionDropdown;   // 0: A, 1: B
-    [SerializeField] private TMP_Dropdown questDropdown;       // 0: クエスト1, 1: クエスト2
+    [SerializeField] private TMP_Dropdown questDropdown;       // 0: セット1, 1: セット2（README 11.8）
     [SerializeField] private Button closeButton;    // 「決定」：値を反映して閉じる
     [SerializeField] private Button cancelButton;   // 「キャンセル」：値を変えずに閉じる（README 3.8）。未設定でも動く
     [SerializeField] private TMP_Text errorText;
@@ -48,7 +48,7 @@ public class TitleMenuUI : MonoBehaviour
     private void OnClickStart()
     {
         // タイトルを通ったときは、表示中の設定を必ずMainSceneへ渡す
-        ExperimentConfig.Set(ExperimentConfig.ParticipantId, ExperimentConfig.Condition, ExperimentConfig.QuestNumber);
+        ExperimentConfig.Set(ExperimentConfig.ParticipantId, ExperimentConfig.Condition, ExperimentConfig.TopicSet);
         SceneManager.LoadScene(MainSceneName);
     }
 
@@ -56,7 +56,7 @@ public class TitleMenuUI : MonoBehaviour
     {
         participantIdInput.text = ExperimentConfig.ParticipantId;
         conditionDropdown.SetValueWithoutNotify(ExperimentConfig.Condition == DialogueCondition.B_ChoiceAndInput ? 1 : 0);
-        questDropdown.SetValueWithoutNotify(ExperimentConfig.QuestNumber - 1);
+        questDropdown.SetValueWithoutNotify(ExperimentConfig.TopicSet - 1);
         errorText.text = "";
         if (logPathText != null)
             logPathText.text = "ログ保存先：" + ExperimentLogger.LogDirectory;
@@ -104,6 +104,6 @@ public class TitleMenuUI : MonoBehaviour
     {
         string condition = ExperimentConfig.Condition == DialogueCondition.B_ChoiceAndInput ? "B" : "A";
         settingsSummaryText.text =
-            ExperimentConfig.ParticipantId + "・" + condition + "・Q" + ExperimentConfig.QuestNumber;
+            ExperimentConfig.ParticipantId + "・" + condition + "・S" + ExperimentConfig.TopicSet;
     }
 }

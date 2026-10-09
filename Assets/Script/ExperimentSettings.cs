@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public enum DialogueCondition
 {
@@ -17,9 +18,10 @@ public class ExperimentSettings : MonoBehaviour
     [Header("対話条件（A: 選択肢のみ / B: 選択肢＋自由入力）")]
     public DialogueCondition condition = DialogueCondition.A_ChoiceOnly;
 
-    [Header("プレイするクエスト（1: 消えた薬草 / 2: 祭りの道具探し）")]
+    [Header("話題セット（1 / 2）（README 11.3）")]
     [Range(1, 2)]
-    public int questNumber = 1;
+    [FormerlySerializedAs("questNumber")]
+    public int topicSet = 1;
 
     public bool AllowFreeInput => condition == DialogueCondition.B_ChoiceAndInput;
 
@@ -40,9 +42,9 @@ public class ExperimentSettings : MonoBehaviour
         {
             participantId = ExperimentConfig.ParticipantId;
             condition = ExperimentConfig.Condition;
-            questNumber = ExperimentConfig.QuestNumber;
+            topicSet = ExperimentConfig.TopicSet;
         }
 
-        UnityEngine.Debug.Log("[Experiment] participant=" + participantId + " condition=" + condition + " quest=" + questNumber);
+        UnityEngine.Debug.Log("[Experiment] participant=" + participantId + " condition=" + condition + " set=" + topicSet);
     }
 }
