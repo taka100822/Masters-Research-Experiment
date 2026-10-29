@@ -3387,7 +3387,7 @@ MonoBehaviour:
     - m_Text: "A\uFF1A\u9078\u629E\u80A2\u306E\u307F"
       m_Image: {fileID: 0}
       m_Color: {r: 1, g: 1, b: 1, a: 1}
-    - m_Text: "B\uFF1A\u9078\u629E\u80A2\uFF0B\u81EA\u7531\u5165\u529B"
+    - m_Text: "B\uFF1A\u81EA\u7531\u5165\u529B\u306E\u307F"
       m_Image: {fileID: 0}
       m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_OnValueChanged:

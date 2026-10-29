@@ -4,7 +4,7 @@ using UnityEngine.Serialization;
 public enum DialogueCondition
 {
     A_ChoiceOnly,
-    B_ChoiceAndInput
+    B_FreeInputOnly
 }
 
 // 実験者がPlay前にInspectorで設定する、プレイ全体の実験設定
@@ -15,7 +15,7 @@ public class ExperimentSettings : MonoBehaviour
     [Header("参加者")]
     public string participantId = "P000";
 
-    [Header("対話条件（A: 選択肢のみ / B: 選択肢＋自由入力）")]
+    [Header("対話条件（A: 選択肢のみ / B: 自由入力のみ）")]
     public DialogueCondition condition = DialogueCondition.A_ChoiceOnly;
 
     [Header("話題セット（1 / 2）（README 1.3）")]
@@ -23,7 +23,8 @@ public class ExperimentSettings : MonoBehaviour
     [FormerlySerializedAs("questNumber")]
     public int topicSet = 1;
 
-    public bool AllowFreeInput => condition == DialogueCondition.B_ChoiceAndInput;
+    // 条件Bでは選択肢を出さず、自由入力だけで話す（README 1.8）
+    public bool FreeInputOnly => condition == DialogueCondition.B_FreeInputOnly;
 
     private void Awake()
     {

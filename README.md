@@ -5,6 +5,7 @@
 > もとは初期の仕様書 `Document_chatGPT.md`（本文中では「元仕様書」）を実装と照合して書き直したもの。元仕様書は削除済みで、`git show ad08eb8:Assets/Document_chatGPT.md` で読める。
 >
 > 2026-10-09に、実験の課題をクエストから「村を5分間自由に探索する」に変えた（1.7）。
+> 2026-10-29に、条件Bを「選択肢＋自由入力」から「自由入力のみ」に変えた（1.8）。同じ日に、各プレイの前のチュートリアルを足した（2.4）。
 >
 > | ファイル | 中身 |
 > |---|---|
@@ -38,10 +39,10 @@
 | 条件 | 対話方式 |
 |---|---|
 | **A：選択肢のみ** | ゲーム側が用意した選択肢からプレイヤーが発言を選ぶ |
-| **B：選択肢＋自由入力** | Aと同じ選択肢に加え、決められた場面で「入力する」を選ぶと文章を入力でき、生成AIがNPCとして返答する |
+| **B：自由入力のみ** | 話しかけるとNPCの最初のセリフ（あいさつ）が出て、そのあとは選択肢を出さず、文章を入力して生成AIのNPCと話す。「会話をやめる」ボタンで会話を終える（4.3） |
 
-* 条件は話題セットやNPCに結び付けず、「参加者が今どちらの条件で遊んでいるか」という**全体設定**として持つ。同じNPC・同じ話題セットでも、条件Aでは選択肢だけ、条件Bでは同じ場面に「入力する」が加わる
-* 設定は実験者がタイトル画面の開発者用モーダルで行う（3.1）。実装上は「`allowInput=1`のノード、かつ条件B」のときだけ「入力する」が出る（4.2）
+* 条件は話題セットやNPCに結び付けず、「参加者が今どちらの条件で遊んでいるか」という**全体設定**として持つ。同じNPC・同じ話題セット・同じ会話データとプロンプトを使い、条件Aでは選択肢だけ、条件Bではあいさつのあと自由入力だけで話す
+* 設定は実験者がタイトル画面の開発者用モーダルで行う（3.1）。実装上は`ExperimentSettings.FreeInputOnly`（条件B）のとき、`DialogueManager`が選択肢を出さずに自由入力へ進む（4.2・4.3）
 
 ## 1.3 話題セットとカウンターバランス
 
@@ -61,7 +62,7 @@
 * 違うもの：村人の名前・性格・話題・衣装（5.2）
 * 村の地形は2回目には覚えているが、順番を入れ替えているので条件の差にはならない
 
-**大前提**：全員の話題2つずつ（1セット12個）は**すべて選択肢だけで聞ける**。自由入力は話を掘り下げる追加の手段で、聞ける話題の数は両条件で同じ。
+**条件A**では、全員の話題2つずつ（1セット12個）は**すべて選択肢だけで聞ける**。**条件B**では選択肢がないので、話題は参加者が質問したときにAIが話す（プロンプトの【知っている情報】。4.5）。聞けた話題の数は条件によって変わりうる（1.8）。
 
 ## 1.4 条件以外の差を小さくする
 
@@ -87,6 +88,13 @@ Unityバージョン・AIモデル・API仕様・NPCプロンプト・会話デ�
 * クエスト用のクラス・データはファイルとしては残してある（8章）
 * 研究上の主な違い：達成条件がなくなり、誰と・どれだけ話すかが参加者に任される。プレイ時間は全員5分にそろうが、条件Bでは返答待ちの時間も5分に含まれる（summary.csvの`ai_wait_total`で把握する。6.7）
 
+## 1.8 条件Bの変更：選択肢＋自由入力から自由入力のみへ（2026-10-29）
+
+条件Bは最初「選択肢＋自由入力」（選択肢に「入力する」が加わる）だったが、2026-10-29に「自由入力のみ」に変えた。決めたこと・研究への影響は[`docs/history.md`](docs/history.md#2026-10-29-条件bを自由入力のみにする)。
+
+* 研究上の主な違い：条件Bでは話題を選択肢で聞けないので、聞けるかどうかは参加者の質問しだいになる（1.3の大前提は条件Aだけのものになった）。比べるのは「選択肢」と「自由入力」という対話方式そのものの違い
+* AIは会話の履歴を持たない（毎回、システムプロンプト＋今回の入力だけ）。履歴を持たせるかは保留（10.4）
+
 ---
 
 # 2. ゲームの概要
@@ -105,6 +113,8 @@ Unityバージョン・AIモデル・API仕様・NPCプロンプト・会話デ�
 ```text
 タイトル画面（実験者が開発者用モーダルで参加者ID・条件・話題セットを設定）
  ↓ はじめる
+チュートリアル（別の場所。2.4）
+ ↓ Enter
 説明画面（村の上で、操作できない状態で表示。3.7）
  ↓ Enter
 探索（5分）：自由に歩き、好きな村人と好きなだけ話す
@@ -124,9 +134,82 @@ Unityバージョン・AIモデル・API仕様・NPCプロンプト・会話デ�
 | Enter | 説明画面を閉じる／話しかける／会話を進める／選択肢を決定する |
 | ↑ ↓ | 選択肢を選ぶ |
 | Q | 設定パネルを開く・閉じる（探索中のみ） |
-| マウスクリック | 自由入力の「送信」（空欄では押せない）・「やめる」（選択肢に戻る）ボタン・設定パネル・タイトル画面の操作 |
+| マウスクリック | 自由入力の「送信」（空欄では押せない）・「会話をやめる」ボタン・設定パネル・タイトル画面の操作 |
 
 移動・カメラは Starter Assets Third Person Controller（購入アセット）の標準入力。会話まわりの入力は`DialogueManager`が`Keyboard.current`を直接見ている。
+
+## 2.4 チュートリアル
+
+各プレイの前に、村とは別の小さな場所（`TutorialScene`）で操作を練習する。実験者が口頭で操作を説明しなくてよいようにし、説明を全員同じにするため。決めたこと・研究への影響は[`docs/history.md`](docs/history.md#2026-10-29-チュートリアル)。
+
+**流れ（1プレイ）**
+
+```text
+タイトル画面（実験者が設定）→ はじめる
+ ↓
+TutorialScene：やることを1つずつこなす（時間制限なし）
+ ↓ 最後に「準備ができたら Enter」
+MainScene：説明画面（3.7）→ Enter → 本番5分
+```
+
+* **各プレイの前に毎回**、同じ手順を最初から行う。その回の条件の話し方だけを練習する（条件Aの回は選択肢、条件Bの回は自由入力）
+* **Shiftを押しながら「はじめる」**を押すと、チュートリアルを飛ばしてMainSceneへ入る（実験者の動作確認用）
+
+**場所**
+
+* プレイヤーのいる所を中心に、一辺40mの平らな草地（`TutorialGround`）。歩けるのは一辺30mの中だけ（見えない壁`TutorialWalls`）
+* 空・ライティング・BGM・プレイヤー・カメラ・会話UI・設定パネル・ミニマップは本番と同じ（MainSceneを複製して作るため）。説明画面・残り時間・制限時間（`ExplorationTimer`）はない
+* ミニマップの地図は草地と歩ける範囲の境目だけの画像（`Assets/Texture/minimap_tutorial.png`）。村人は本番と同じ白い丸
+
+**案内役の村人**（話題セットとは別。名前はNBA選手から）
+
+| npcId | 名前 | 位置（プレイヤーの向きから） |
+|---|---|---|
+| `TUT001` | 案内人ケビン | 右3m・前6m |
+| `TUT002` | 旅人クリス | 右5m・前11m |
+
+* 見た目は本番の村人のモデルを使い、**今回の村では使わない方の衣装**（もう一方の話題セットの衣装）にする。例：話題セット1の回のケビンは、セット2のNPC001（大工シャック）の衣装
+* セリフ・プロンプトは村と関係のない軽い話（天気・広場・旅）。本番の村人の名前・居場所・話題には触れない。全文は[`docs/topic-sets.md`](docs/topic-sets.md#4-チュートリアル)
+
+**やること**（画面上部中央の「やること」の札。できたら「できました！」を出し、1秒後に次へ）
+
+| # | 札の文（A：条件A、B：条件B） | 次へ進む条件 |
+|---|---|---|
+| 1 | `[W][A][S][D] で歩いてみましょう。マウスで見回せます` | 横に合計3m歩いた |
+| 2 | `右上の地図の白い丸が村人です。案内人ケビンに近づいて [Enter] で話しかけましょう` | ケビンとの会話が始まった |
+| 3 | A：`[↑][↓] で選んで [Enter] で決めましょう。会話を最後まで進めます`／B：`話したいことを書いて「送信」を押しましょう。返事を読んだら「会話をやめる」で終えます` | ケビンとの会話を閉じた（その会話で、Aは選択肢を1回以上決めた、Bは返事を1回以上表示した） |
+| 4 | A：`旅人クリスにも話しかけて、会話を最後まで進めましょう`／B：`旅人クリスにも話しかけて、何か聞いてみましょう。終わったら「会話をやめる」` | クリスとの会話を閉じた（条件は3と同じ） |
+| 5 | `[Q] で設定を開けます。音の大きさを変えたり、動けなくなったときに「初期位置に戻る」を押したりできます。開いて閉じてみましょう` | 設定パネルを開いて閉じた |
+| 6 | `本番では右上に残り時間が出て、5分たつと自動で終わります。準備ができたら [Enter]` | Enter → MainSceneへ |
+
+* 札は残り時間の窓と同じ見た目（樫色＋真鍮の縁）で、幅720×高さ96、画面上端から16px。文字20px・中央揃え。会話中・設定パネル表示中も出たまま（設定パネルの暗幕の下になる）
+* 順番どおりにしか進まない（例：1の前にケビンと話しても、2は「話しかけた」にならない。話すこと自体はできる）
+* 6を出したら、移動・話しかけ・設定パネルを止める（`DialogueManager.LockForTutorialEnd`）。Enterは札が出た次のフレームから受け付ける
+* 音量・視点の速さはシーンごとに初期値に戻るので、チュートリアルで変えても本番には引き継がれない（1.4）
+
+**会話データとプロンプト**
+
+* 条件A：`Assets/Resources/dialogue/Tutorial/TUT001.csv`・`TUT002.csv`（あいさつ → 選択肢2つ → 一言 → 別れ）
+* 条件B：`Assets/Resources/PromptData/Tutorial/TUT001`・`TUT002`（4.5のテンプレートに沿う。【村の人たち】は書かず、村のことは知らないと答える）
+* 本番と同じ`DialogueManager`の仕組み（4章）で動く。チュートリアル中（`TutorialGuide.Active`）は読む場所だけが`Tutorial/`になる
+
+**ログ**
+
+* 本番とは**別のファイル**：`{参加者ID}_{条件}_S{話題セット番号}_{開始日時}_tutorial.csv`（形式は6.6と同じ）。summary.csvには何も足さない
+* ふだんのイベント（`dialogue_start`・`npc_line`・`choice_select`・`free_input_submit`・`ai_response`・`settings_open`など）に加えて、次を書く
+
+| event_type | いつ | 主な記録内容 |
+|---|---|---|
+| `tutorial_start` | 始めたとき | `detail`に`condition=A`／`B` |
+| `tutorial_step` | やることを1つ終えたとき | `detail`に`step=1`〜`5` |
+| `tutorial_end` | 最後にEnterを押したとき | — |
+
+* 終わり方（`session_end`の`reason`）は`tutorial_end`（途中でタイトルへ戻ったら`back_to_title`）
+* `ai_response`の`detail`のプロンプトは`prompt=Tutorial/TUT001`のようになる
+
+**作り方**：シーンは手で作らず、Unityのメニュー **Tools → 研究用 → チュートリアルのシーンを作り直す**（`TutorialSceneBuilder`）で、MainSceneから作る。MainSceneを複製し、村（`Background`・`WaterBlockers`）とNPC003〜006を消し、NPC001・002を案内役に作り替え、草地・壁・札・ミニマップの地図を置いて、ビルド設定（タイトルの次）に足す。**MainSceneのプレイヤー・UI・NPCを変えたら作り直す**（作り直すと`TutorialScene`の手での変更は消える）
+
+**実装**：`TutorialGuide`（`TutorialScene`の`GameManager`に付ける）が進み具合を持つ。`DialogueManager`は会話の開始・選択の決定・AIの返事の表示・会話の終わり・設定パネルの開閉を`TutorialGuide.Instance`に知らせる（MainSceneでは`Instance`が無いので何もしない）
 
 ---
 
@@ -163,7 +246,7 @@ Unityバージョン・AIモデル・API仕様・NPCプロンプト・会話デ�
  │ 開発者用設定                      │
  │                                 │
  │ 参加者ID   [ P000            ]   │
- │ 対話条件   [ A：選択肢のみ    ▼]  │  ← A：選択肢のみ／B：選択肢＋自由入力
+ │ 対話条件   [ A：選択肢のみ    ▼]  │  ← A：選択肢のみ／B：自由入力のみ
  │ 話題セット [ 1：セット1       ▼]  │  ← 1：セット1／2：セット2
  │                                 │
  │ 参加者IDを入力してください        │  ← エラー（赤系）
@@ -216,7 +299,7 @@ Canvas（Screen Space Overlay）
 * **ボタンの約束**：真鍮の地＋濃い文字＝決定（主な操作）、枠線だけ＝それ以外。キーの案内（`[Enter]`・`[Q]`など）は真鍮色の文字
 * **文字**：`NotoSansJP-Regular SDF`だけを使う（日本語フォントを増やさない）。大きさと太さで差をつける：名前26（TMPの太字）、本文24（行間+10%）、選択肢22、操作案内16
 * **窓の素材**：白い角丸の板（`Assets/Texture/ui_panel_fill.png`）と角丸の縁線（`ui_panel_frame.png`）。どちらもエディタ上のコードで生成した64×64の画像で、9スライス（境界18px）。`Image`の色で塗り分ける。窓の縁は子の`Frame`
-* 「入力する」も他の選択肢と**同じ見た目**にする（アイコン・色分けをしない）。条件Bで増えるのは選択肢1行と、入力中の窓だけ（1.4）
+* 条件の違いで見た目が変わるのは、条件Aの選択肢の窓と、条件Bの自由入力の窓だけ。どちらも同じ窓の素材・色を使う（1.4）
 
 ## 3.3 会話UI
 
@@ -228,7 +311,6 @@ Canvas（Screen Space Overlay）
                                 ┌──────────────────────┐
                                 │▶ 仕事のこと            │ ← 選択肢（選択中は真鍮の下地＋▶）
                                 │  村の人のこと          │
-                                │  入力する              │ ← 条件Bかつ allowInput=1 のノードのみ
                                 └──────────────────────┘
    ╔═══════════╗
    ║ 薬師ティム ║ ← 吊り看板（梁色＋真鍮の縁、窓の上辺にかかる）
@@ -241,7 +323,7 @@ Canvas（Screen Space Overlay）
 
 * **会話窓**（`DialoguePanel`）：幅960×高さ170、画面下から24px。本文は左揃え、左右の余白36px。本文の改行は3.4
 * **名前の吊り看板**（`NamePlate`）：窓の左上（左から28px）で、上辺をまたぐ位置に置く。幅は名前の長さに合わせて伸びる（`ContentSizeFitter`）。名前は`NPCDialogue.DisplayName`
-* **選択肢**（`ChoicePanel`）：画面下から230px（看板より上）、右端を画面中央+300pxにそろえる（右上のミニマップ・残り時間と重ならない）。行（`ChoiceRow1〜3`、下地の`Image`）の中に`Choice1〜3Text`があり、選択中の行だけ真鍮25%の下地＋先頭に▶。選ばれていない行は煤色で、▶の幅を透明であけて文の頭をそろえる。使わない行は非表示
+* **選択肢**（`ChoicePanel`。条件Aだけ）：画面下から230px（看板より上）、右端を画面中央+300pxにそろえる（右上のミニマップ・残り時間と重ならない）。行（`ChoiceRow1〜3`、下地の`Image`）の中に`Choice1〜3Text`があり、選択中の行だけ真鍮25%の下地＋先頭に▶。選ばれていない行は煤色で、▶の幅を透明であけて文の頭をそろえる。使わない行は非表示
 * **▼**（`NextIndicator`）：窓の中の右下で、`UIBob`で上下に4px揺れる（会話送りできることを知らせる。画面の動きはこれだけ）。選択肢を選んでいる間は出さない
 * 会話中・自由入力中・AIの返答待ちの間は、プレイヤーの移動・カメラ操作を止める
 
@@ -254,21 +336,21 @@ Canvas（Screen Space Overlay）
 | `InTyping` | `入力したら「送信」を押してください` |
 | AIの返答待ち | `返事を待っています…` |
 
-**自由入力の窓**（`InputPanel`）
+**自由入力の窓**（`InputPanel`。条件Bだけ）
 
 ```text
  ┌──────────────────────────────────────────────────────────┐
  │ 薬師ティムに話しかける                                      │ ← 小見出し（InputHeaderText・煤色）
- │ ┌──────────────────────────────────┐ [ やめる ] [ 送信 ]   │ ← 入力欄（漆喰の地・濃い文字）
+ │ ┌────────────────────────────────┐ [ 会話をやめる ] [ 送信 ] │ ← 入力欄（漆喰の地・濃い文字）
  │ │ 聞きたいことを書いてください       │                       │
  │ └──────────────────────────────────┘                       │
  └──────────────────────────────────────────────────────────┘
  ┌ 会話窓（直前のセリフはそのまま表示）─────────────────────────┐
 ```
 
-* 会話窓の上（画面下から230px、看板にかからない位置）に、会話窓と同じ幅960×高さ104で出す。会話窓（直前のセリフ）は表示したまま
+* 会話窓の上（画面下から230px、看板にかからない位置）に、会話窓と同じ幅960×高さ104で出す。会話窓（直前のセリフ）は表示したまま。入力欄の幅は「会話をやめる」の分だけ縮めてある（`InputField`の`SizeDelta.x`＝-368）
 * **送信**（`SendButton`）：真鍮の地。入力欄が空（空白だけを含む）の間は押せない。Enterでは送らない（4.1）
-* **やめる**（`CancelButton`→`DialogueManager.OnClickCancelInput`）：枠線だけ。入力欄を閉じ、同じノードの選択肢（「入力する」を含む）に戻る。書きかけの文章は捨てる（送れなかった文章の残し（4.6）も消す）。ログは`free_input_cancel`
+* **会話をやめる**（`CancelButton`→`DialogueManager.OnClickCancelInput`）：枠線だけ。幅160（送信は120）。書きかけの文章（送れなかった文章の残し（4.6）も）を捨てて**会話を閉じる**。ログは`dialogue_end`（`detail`に`end=quit_button`）
 * プレースホルダーは「聞きたいことを書いてください」
 
 **話しかけ案内**（`TalkHint`）：近くのNPCがいると、画面下中央（下から48px）に樫色の小さな札で`[Enter] 薬師ティムと話す`と出す（近くのNPCの名前を入れる。文字は子の`TalkHintText`）。NPC頭上の吹き出し（3.5）も同時に出る。会話窓が出ている間は出さない。
@@ -327,7 +409,7 @@ TextMeshProは日本語を1文字ごとにどこでも折り返すので、そ�
 
 ## 3.7 説明画面・残り時間・終了画面
 
-**説明画面**（`IntroPanel`）：MainSceneに入ると、画面全体の暗幕（黒50%）の上に、会話窓と同じ見た目（樫色＋真鍮の縁、640×260）の窓を中央に出す。この間は動けない（`GameState.Intro`）。Enterで閉じると、5分を数え始める（5.1）。両条件・両セットで同じ文で、条件Bの「入力する」には触れない（操作は実験者が事前に口頭で説明する）。
+**説明画面**（`IntroPanel`）：MainSceneに入ると、画面全体の暗幕（黒50%）の上に、会話窓と同じ見た目（樫色＋真鍮の縁、640×260）の窓を中央に出す。この間は動けない（`GameState.Intro`）。Enterで閉じると、5分を数え始める（5.1）。両条件・両セットで同じ文で、条件Bの自由入力には触れない（操作は実験者が事前に口頭で説明する）。
 
 ```text
 これから5分間、村の中を自由に歩いて、
@@ -397,9 +479,9 @@ TextMeshProは日本語を1文字ごとにどこでも折り返すので、そ�
 |---|---|
 | `Intro` | 説明画面（3.7）。Enterで閉じて`FreeMove`へ |
 | `FreeMove` | 探索中。移動・カメラ操作ができる。近くにNPCがいればEnterで話しかけられる。Qで設定パネル |
-| `InDialogue` | 会話中（選択肢なし）。Enterで次へ |
+| `InDialogue` | 会話中（選択肢なし）。Enterで次へ（条件Bでは自由入力へ） |
 | `InChoice` | 選択肢を選んでいる。↑↓で移動、Enterで決定 |
-| `InTyping` | 自由入力中。送信はボタンのみ（IME変換中のEnterで誤送信しないよう、Enterでは送らない）。「やめる」ボタンで同じノードの選択肢（`InChoice`）に戻る。AIの返答待ちの間もこの状態 |
+| `InTyping` | 自由入力中。送信はボタンのみ（IME変換中のEnterで誤送信しないよう、Enterでは送らない）。「会話をやめる」ボタンで会話を閉じる（`FreeMove`）。AIの返答待ちの間もこの状態。条件Bだけ |
 | `Ended` | 時間切れ後の終了画面。操作不可 |
 | `InSettings` | 設定パネル表示中。時間停止 |
 
@@ -407,28 +489,32 @@ TextMeshProは日本語を1文字ごとにどこでも折り返すので、そ�
 
 ## 4.2 会話の進み方
 
-会話は会話データ（CSV）の**ノード**を順にたどる（4.4）。
+**条件A**：会話は会話データ（CSV）の**ノード**を順にたどる（4.4）。
 
-* 1ノードの選択肢は最大3つ：`choiceA`、`choiceB`（それぞれ空でなければ表示）、「入力する」（`allowInput=1`かつ条件Bのときだけ自動で追加）
+* 1ノードの選択肢は最大2つ：`choiceA`、`choiceB`（それぞれ空でなければ表示）
 * 選択肢が1つも無いノードでは「次へ」の案内だけを出し、Enterで`nextId`へ進む。`nextId=-1`なら会話を終える
 * 「なんでもない」「じゃあね」のような選択肢は、`choiceA`／`choiceB`の文として書き、遷移先に終了用のノードを置く
 * 時間切れのあとは、次のノード・選んだ先へは進まず、会話を閉じて終了画面にする（5.1）
 
-## 4.3 自由入力とAIの返答
+**条件B**：ノード`0`（あいさつ）だけを表示する。選択肢は出さず`[Enter] 次へ`の案内を出し、Enterで自由入力へ進む（4.3）。ノード`0`より先のノードは表示しない
+
+## 4.3 自由入力とAIの返答（条件B）
 
 ```text
-「入力する」を選ぶ → 入力欄を表示（カーソル表示・移動停止）
- ↓ 送信ボタン
-AIへ送信（返答を待つ間もプレイヤーは動けない）
- ↓
-AIの返答をNPCのセリフとして表示
+話しかける → ノード0のあいさつ（[Enter] 次へ）
  ↓ Enter
-「入力する」を選んだノードの nextId へ進む（-1なら会話終了）
+自由入力の窓を表示（カーソル表示・移動停止）
+ ├ 送信ボタン → AIへ送信（返答を待つ間もプレイヤーは動けない）
+ │    ↓
+ │  AIの返答をNPCのセリフとして表示（[Enter] 次へ）
+ │    ↓ Enter
+ │  また自由入力の窓へ（何回でも）
+ └ 会話をやめるボタン → 会話を閉じる
 ```
 
-* AIの返答のあとに進む先は、自由入力を始めた**元のノードの`nextId`**
-* 自由入力を出すノードは、`nextId`を**自分自身のID**にしている（5.3）。返答のあとEnterで同じノード（同じ選択肢＋「入力する」）に戻るので、何回でも続けて質問でき、「じゃあね」などの選択肢で会話を終えられる
+* 話題は**聞かれたら話すだけ**。プロンプトの【知っている情報】に話題1・2が書いてある（4.5・5.4）
 * AIは会話の履歴を持たない（毎回、システムプロンプト＋今回の入力だけを送る）
+* **実装**：`DialogueManager`の`FreeInputOnly`（`ExperimentSettings.FreeInputOnly`）。`ShowChoicesFromNode`は条件Bでは選択肢を作らず`InDialogue`にし、`HandleDialogueInput`はEnterで`OpenInputMode`を呼ぶ。「会話をやめる」は`OnClickCancelInput`→`CloseDialogue("end=quit_button")`
 
 ## 4.4 会話データ（CSV）
 
@@ -444,7 +530,7 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 | `text` | NPCのセリフ（**半角カンマは使えない**。読点「、」を使う） |
 | `nextId` | 選択肢が無いときの次のノード（`-1`で終了） |
 | `choiceA`／`choiceA_next`、`choiceB`／`choiceB_next` | 選択肢の文と遷移先 |
-| `allowInput` | `1`なら条件Bで「入力する」を出す（列が無いCSVは0扱い） |
+| `allowInput` | 使っていない（条件Bが「選択肢＋自由入力」だったころ、「入力する」を出すノードの印。列は残してある） |
 | `action` | ノードを表示した瞬間に実行する：`topic:<番号>`（話題を聞いた。ログの`topic_heard`）。空なら何もしない |
 
 * **会話はいつもノード`0`から始まる**（前に聞いた話題を覚えておく仕組みはない）
@@ -508,7 +594,7 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 * **エラーのときの表示**：NPCのセリフ欄に、世界観を壊さない一文を出す（全NPC共通）。かっこ書きのナレーションにして、NPC本人のセリフに見えないようにする
   `（うまく伝わらなかったようだ。もう一度話しかけてみよう）`
 * エラーかどうかは、`ChatGPTClient.SendChatMessage`が返す`ChatResult`（`Success`／`Text`／`Error`）で判定する
-* **もう一度試す**：エラーのあとEnterを押すと、同じノードの選択肢（「入力する」を含む）に戻る（`nextId`＝自分自身。5.3）。そこで「入力する」を選ぶと、**失敗した文章が入力欄に残っている**ので、そのまま送信し直せる（成功したら入力欄は空に戻す。「やめる」でも消す）
+* **もう一度試す**：エラーのあとEnterを押すと、自由入力の窓に戻る。**失敗した文章が入力欄に残っている**ので、そのまま送信し直せる（成功したら入力欄は空に戻す。「会話をやめる」でも消す）
 * **ログ**：`ai_response`の`text`には参加者に表示した一文を、`detail`に失敗の理由を書く（`error=timeout`／`network`／`http_<コード>`／`parse`／`no_key`）。`is_error=1`
 
 ---
@@ -527,7 +613,7 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 |---|---|
 | 探索中（`FreeMove`） | すぐ |
 | 会話中（`InDialogue`）・選択肢（`InChoice`） | 今のセリフをEnterで閉じた（選択肢を決定した）とき。選んだ先には進まない |
-| 自由入力中（`InTyping`） | 「送信」なら、AIの返答を表示してEnterを押したとき。「やめる」ならそのとき |
+| 自由入力中（`InTyping`） | 「送信」なら、AIの返答を表示してEnterを押したとき。「会話をやめる」ならそのとき |
 | AIの返答待ち | 返答を表示してEnterを押したとき |
 | 設定パネル（`InSettings`） | （時間が止まっているので起きない） |
 
@@ -553,7 +639,7 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 
 ## 5.3 会話の型（全NPC・両セット共通）
 
-**会話はいつも`0`から始まる**（4.4）。1人につき話題を2つ持ち、選択肢でどちらも聞ける。
+条件Aの会話の型。条件Bではノード`0`だけを使う（4.2）。**会話はいつも`0`から始まる**（4.4）。1人につき話題を2つ持ち、選択肢でどちらも聞ける。
 
 | id | 内容 | 選択肢・遷移 | 入力 | action |
 |---|---|---|---|---|
@@ -566,13 +652,12 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 | 90 | 「そう、またね」など | 終 | | |
 | 99 | 別れのあいさつ | 終 | | |
 
-* 選択肢は1ノード最大2つ＋「入力する」（4.2）。CSVの形式（4.4）はクエスト版と同じ
+* 選択肢は1ノード最大2つ（4.2）。CSVの形式（4.4）はクエスト版と同じ。表の「入力」列（`allowInput`）は今は使っていない
 * `action`は`topic:<番号>`（話題を聞いた。ログの`topic_heard`）だけを使う
 * 話題1（**仕事のこと**）はその人自身の仕事・暮らし、話題2（**村の人のこと**）は別の村人1人の居場所・人柄。話題2で紹介される人は、各セットで6人とも1回ずつになるようにする（誰かの話から次に話す人を見つけられる）
 * 選択肢の文（「話を聞く」「なんでもない」「仕事のこと」「村の人のこと」「ほかの話も聞く」「じゃあね」）は全員・両セットで同じ。「ほかの話も聞く」はまだ聞いていない方の話題へ進む（話題1のあとは話題2へ、話題2のあとは話題1へ）
 * 長さもそろえる：どの話題も2ノード、1ノードは60字前後まで（会話窓の3行に収まる）
-* 自由入力が出るのは1人3か所（`10`・`21`・`31`）。`nextId`を自分自身にして、何回でも続けて聞ける（4.3と同じ）
-* **大前提**（1.3）：全員の話題2つずつ（1セット12個）は**すべて選択肢だけで聞ける**
+* 条件Aでは、全員の話題2つずつ（1セット12個）は**すべて選択肢だけで聞ける**（1.3）
 * 同じ人に何回話しかけても同じ会話になる（前に聞いた話題を覚えておく仕組みは作らない）
 
 ## 5.4 話題セットの中身
@@ -617,6 +702,7 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 * エディタではUnityがCSVをテキストアセットとして取り込み、`.meta`を作る（ログの中身には影響しない）。`.meta`も`.gitignore`の対象
 
 * ファイル名：`{参加者ID}_{条件}_S{話題セット番号}_{開始日時}.csv`（例：`P001_B_S2_20261012_143005.csv`）
+* チュートリアルは同じフォルダに`…_tutorial.csv`（2.4）
 * `summary.csv`も同じフォルダ
 * 保存先のパスはセッション開始時にConsoleへ`[Log] Session log: …`と出る。タイトル画面の開発者用モーダルの下にも「ログ保存先：…」と表示する
 
@@ -629,18 +715,18 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 | `dialogue_start` | NPCに話しかけた | NPC ID・開始ノードID（いつも0） |
 | `npc_line` | NPCのセリフが表示された | NPC ID・ノードID・セリフ |
 | `topic_heard` | 話題を聞いた（`topic:`のノードを表示した） | NPC ID・ノードID・`detail`に話題番号（`topic`）、それまでに聞いた話題の数（`topics_heard`、同じ話題を2回聞いても1つ）、話しかけたNPCの人数（`npcs_talked`） |
-| `choice_select` | 選択肢を決定した | NPC ID・ノードID・選択肢の文・何番目か（「入力する」も含む） |
+| `choice_select` | 選択肢を決定した | NPC ID・ノードID・選択肢の文・何番目か（条件Aだけ） |
 | `free_input_submit` | 自由入力を送信した | NPC ID・ノードID・入力した文章 |
-| `free_input_cancel` | 自由入力を「やめる」で閉じた（3.3） | NPC ID・ノードID（書きかけの文章は記録しない）。集計（summary.csv）には入れない |
 | `ai_response` | AIの返答が表示された | NPC ID・ノードID・返答・応答時間（ミリ秒）・エラーかどうか・プロンプトの識別子 |
-| `dialogue_end` | 会話を閉じた | NPC ID・会話時間・この会話での選択回数・自由入力回数 |
+| `dialogue_end` | 会話を閉じた | NPC ID・会話時間・この会話での選択回数・自由入力回数。「会話をやめる」で閉じたときは`detail`に`end=quit_button` |
 | `time_up` | 5分たった | `detail`にそのときの状態（`state=InChoice`など） |
 | `settings_open`／`settings_close` | 設定パネルの開閉 | 閉じたときの音量・感度。`duration`は開いていた**実時間**（パネル表示中は`play_time`が止まるため）。スライダーの細かい動きは記録しない |
 | `respawn` | 「初期位置に戻る」を押した | 押す前の位置（`from_x`／`from_z`） |
 | `session_end` | セッションの終わり | 終わり方（`time_up`／`back_to_title`／`app_quit`。それ以外でシーンが消えたときは`scene_unloaded`）・総プレイ時間。会話中・設定パネル表示中に終わった場合は、先にその`dialogue_end`／`settings_close`を書く |
 
 * **AIのエラー**：返答が得られなかったら`is_error=1`にし、`detail`に理由（`error=…`）を書く（4.6）。プロンプトが見つからなかったときも`is_error=1`（`detail`は`prompt=none`）
-* `npc_line`はノードを表示するたびに書く（AIの返答のあと同じノードに戻ったときも、もう一度書かれる）
+* `npc_line`はノードを表示するたびに書く。条件Bではノード`0`のときだけ
+* 条件Bでは`choice_select`・`topic_heard`は出ない（ノード`0`には`topic:`が無いため）。話題を聞けたかは、`free_input_submit`・`ai_response`の文章から後で判定する
 * 会話時間（`dialogue_end`の`duration`）・会話ごとの選択回数と自由入力回数は、`ExperimentLogger`が自分で計算して書く
 * 時間切れ（`time_up`）から終了画面（`session_end`）までの超過時間は、2つの`play_time`の差で分かる
 * **プロンプトの識別子**：使った`PromptData`の場所（例：`S1/NPC005`）と、本文のハッシュ値（先頭8文字）。実験期間中にプロンプトが変わっていないかを後から確認できる（1.5）
@@ -658,7 +744,7 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 
 | クラス | 場所 | イベント |
 |---|---|---|
-| `DialogueManager` | `StartNode`／`ShowNode`／`ExecuteNodeAction`／選択肢の決定／`SubmitTypedText`／`OnClickCancelInput`／`ShowAIResponse`／`CloseDialogue`／`HandleTimeUp`／`OpenSettings`／`CloseSettings`／`RespawnPlayer` | dialogue_start／npc_line／topic_heard／choice_select／free_input_submit／free_input_cancel／ai_response／dialogue_end／time_up／settings_open／settings_close／respawn |
+| `DialogueManager` | `StartNode`／`ShowNode`／`ExecuteNodeAction`／選択肢の決定／`SubmitTypedText`／`ShowAIResponse`／`CloseDialogue`／`HandleTimeUp`／`OpenSettings`／`CloseSettings`／`RespawnPlayer` | dialogue_start／npc_line／topic_heard／choice_select／free_input_submit／ai_response／dialogue_end／time_up／settings_open／settings_close／respawn |
 | `ExplorationTimer` | `Begin` | explore_start |
 | `SettingsPanelUI` | 「タイトルへ戻る」 | session_end（back_to_title） |
 | `DialogueManager` | `EndGame`（終了画面） | session_end（time_up） |
@@ -697,7 +783,7 @@ session_id,participant_id,condition,set,start_time,end_reason,total_play_time,ex
 
 * `*_time`：そのイベントが起きた`play_time`（起きなければ空欄）
 * `ai_wait_total`：AIの返答待ちの合計秒数（`ai_response`の`latency_ms`の合計）。条件Bでは5分のうちこの分だけ歩く・話す時間が減るので、分析で考慮できるように入れている
-* `npcs_talked`：話しかけた人数（0〜6）、`topics_heard`：聞いた話題の数（0〜12）
+* `npcs_talked`：話しかけた人数（0〜6）、`topics_heard`：聞いた話題の数（0〜12）。条件Bでは**空欄**（話題を選択肢で聞かないため。0だと「1つも聞かなかった」と読めてしまう）
 * `talk_NPC00x`：そのNPCとの会話の回数と合計時間（例：`3/42.5`＝3回・42.5秒）
 * イベントログから計算し直せる内容だが、条件A・Bの比較をすぐできるように用意する
 * 既にある`summary.csv`の1行目が今の列と違う（クエスト版のものなど）ときは、`summary_old_{日時}.csv`に名前を変えてから新しく作る（列がずれた行が混ざらないように）
@@ -720,7 +806,8 @@ session_id,participant_id,condition,set,start_time,end_reason,total_play_time,ex
 | シーン | ビルド番号 | 内容 |
 |---|---|---|
 | `Assets/TitleScene.unity` | 0 | タイトル画面（3.1） |
-| `Assets/MainScene.unity` | 1 | 村。`GameManager`オブジェクトに`GameManager`・`DialogueManager`・`ChatGPTClient`・`ExperimentSettings`・`ExplorationTimer`・`AudioVolumeSettings`・`LookSensitivitySettings`・`ExperimentLogger`が付いている |
+| `Assets/TutorialScene.unity` | 1 | チュートリアル（2.4）。MainSceneから`TutorialSceneBuilder`で作る |
+| `Assets/MainScene.unity` | 2 | 村。`GameManager`オブジェクトに`GameManager`・`DialogueManager`・`ChatGPTClient`・`ExperimentSettings`・`ExplorationTimer`・`AudioVolumeSettings`・`LookSensitivitySettings`・`ExperimentLogger`が付いている |
 
 ## 7.3 プレイヤーとカメラ
 
@@ -778,6 +865,7 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 | `TitleMenuUI` | タイトル画面のボタンと開発者用モーダル（TitleScene） |
 | `DialogueManager` | 会話の進行・会話UI・状態管理の中心。説明画面、時間切れの扱い、プレイヤーの停止、設定パネルの開閉、初期位置に戻る処理も担当 |
 | `ExplorationTimer` | 探索の制限時間（5分）と残り時間の表示（5.1） |
+| `TutorialGuide` | チュートリアルの「やること」の進み具合と札（2.4。TutorialSceneだけ） |
 | `DialogueDatabase` | 会話CSVの読み込み |
 | `NPCDialogue` | NPCごとのデータ（`npcId`・話題セットごとの名前と衣装・`csvFileName`・`promptData`（セット別のプロンプトが無いときの予備）） |
 | `NPCInteraction` | 近づいたかの判定、頭上の名前・吹き出し（依頼人の色分けの仕組みも残っているが、今は働かない） |
@@ -793,6 +881,7 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 | `ExperimentLogger` | 実験ログ（6章） |
 | `GameState`（enum） | 4.1 |
 | `SceneBuildTools`（エディタ用） | メニュー「Tools/研究用」：水の壁を作り直す・ミニマップの地図を撮り直す |
+| `TutorialSceneBuilder`（エディタ用） | メニュー「Tools/研究用」：チュートリアルのシーンを作り直す（2.4） |
 | `QuestData`（ScriptableObject）・`QuestManager`・`QuestPanelUI` | **使っていない**（クエスト版。1.7）。シーンからは外し、ファイルとデータ（`Resources/Quest/`）だけ残している |
 
 ---

@@ -7,6 +7,7 @@ using TMPro;
 public class TitleMenuUI : MonoBehaviour
 {
     public const string MainSceneName = "MainScene";
+    public const string TutorialSceneName = "TutorialScene";
 
     [Header("タイトル")]
     [SerializeField] private Button startButton;
@@ -49,13 +50,17 @@ public class TitleMenuUI : MonoBehaviour
     {
         // タイトルを通ったときは、表示中の設定を必ずMainSceneへ渡す
         ExperimentConfig.Set(ExperimentConfig.ParticipantId, ExperimentConfig.Condition, ExperimentConfig.TopicSet);
-        SceneManager.LoadScene(MainSceneName);
+
+        // ふだんはチュートリアルから。Shiftを押しながらなら飛ばす（実験者の動作確認用。README 2.4）
+        var keyboard = UnityEngine.InputSystem.Keyboard.current;
+        bool skipTutorial = keyboard != null && keyboard.shiftKey.isPressed;
+        SceneManager.LoadScene(skipTutorial ? MainSceneName : TutorialSceneName);
     }
 
     private void OpenDeveloperModal()
     {
         participantIdInput.text = ExperimentConfig.ParticipantId;
-        conditionDropdown.SetValueWithoutNotify(ExperimentConfig.Condition == DialogueCondition.B_ChoiceAndInput ? 1 : 0);
+        conditionDropdown.SetValueWithoutNotify(ExperimentConfig.Condition == DialogueCondition.B_FreeInputOnly ? 1 : 0);
         questDropdown.SetValueWithoutNotify(ExperimentConfig.TopicSet - 1);
         errorText.text = "";
         if (logPathText != null)
@@ -75,7 +80,7 @@ public class TitleMenuUI : MonoBehaviour
         }
 
         var condition = conditionDropdown.value == 1
-            ? DialogueCondition.B_ChoiceAndInput
+            ? DialogueCondition.B_FreeInputOnly
             : DialogueCondition.A_ChoiceOnly;
 
         ExperimentConfig.Set(id, condition, questDropdown.value + 1);
@@ -102,7 +107,7 @@ public class TitleMenuUI : MonoBehaviour
     // 実験者の確認用。参加者が条件を意識しないよう「条件」の語は出さない（README 3.1）
     private void UpdateSummary()
     {
-        string condition = ExperimentConfig.Condition == DialogueCondition.B_ChoiceAndInput ? "B" : "A";
+        string condition = ExperimentConfig.Condition == DialogueCondition.B_FreeInputOnly ? "B" : "A";
         settingsSummaryText.text =
             ExperimentConfig.ParticipantId + "・" + condition + "・S" + ExperimentConfig.TopicSet;
     }

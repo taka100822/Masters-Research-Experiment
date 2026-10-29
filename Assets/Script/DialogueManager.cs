@@ -267,10 +267,12 @@ public class DialogueManager : MonoBehaviour
 
     private static int TopicSet => ExperimentSettings.Instance != null ? ExperimentSettings.Instance.topicSet : 1;
 
-    // Dialogue/S{話題セット番号}/ から読む（README 4.4）
+    // Dialogue/S{話題セット番号}/ から読む（README 4.4）。チュートリアルでは Dialogue/Tutorial/（README 2.4）
+    private static string DataFolder => TutorialGuide.Active ? "Tutorial" : "S" + TopicSet;
+
     private bool LoadDialogueCSV(string csvFileName)
     {
-        return dialogueDatabase.LoadCSV("Dialogue/S" + TopicSet + "/" + csvFileName);
+        return dialogueDatabase.LoadCSV("Dialogue/" + DataFolder + "/" + csvFileName);
     }
 
     private void StartNode(int id)
@@ -286,6 +288,7 @@ public class DialogueManager : MonoBehaviour
         StopPlayer();
 
         ExperimentLogger.Log("dialogue_start", npcId: CurrentNpcId, nodeId: id);
+        TutorialGuide.Instance?.OnDialogueStarted(CurrentNpcId);
 
         ShowNode();
     }
@@ -310,8 +313,19 @@ public class DialogueManager : MonoBehaviour
         ShowChoicesFromNode();
     }
 
+    // 条件B：選択肢を出さず、ノード0のセリフのあとは自由入力だけで話す（README 1.8）
+    private static bool FreeInputOnly => ExperimentSettings.Instance != null && ExperimentSettings.Instance.FreeInputOnly;
+
     private void ShowChoicesFromNode()
     {
+        if (FreeInputOnly)
+        {
+            currentState = GameState.InDialogue;
+            nextIndicator.SetActive(true);
+            SetDialogueKeyGuide(false);
+            return;
+        }
+
         var list = new List<Choice>();
 
         if (!string.IsNullOrEmpty(currentNode.choiceA))
@@ -329,18 +343,6 @@ public class DialogueManager : MonoBehaviour
             {
                 text = currentNode.choiceB,
                 onSelect = () => GoToNode(currentNode.choiceB_next)
-            });
-        }
-
-        // 自由入力は条件Bのときのみ（条件はクエスト・NPCに依存しない全体設定）
-        if (currentNode.allowInput == 1 &&
-            ExperimentSettings.Instance != null &&
-            ExperimentSettings.Instance.AllowFreeInput)
-        {
-            list.Add(new Choice
-            {
-                text = "入力する",
-                onSelect = OpenInputMode
             });
         }
 
@@ -367,6 +369,13 @@ public class DialogueManager : MonoBehaviour
         if (IsTimeUp)
         {
             CloseDialogue();
+            return;
+        }
+
+        // 条件B：あいさつ・AIの返答のあとは自由入力へ（README 1.8）
+        if (FreeInputOnly)
+        {
+            OpenInputMode();
             return;
         }
 
@@ -474,6 +483,7 @@ public class DialogueManager : MonoBehaviour
 
             ExperimentLogger.Log("choice_select", npcId: CurrentNpcId, nodeId: currentNodeId,
                 text: choices[choiceIndex].text, choiceIndex: choiceIndex);
+            TutorialGuide.Instance?.OnDialogueAction();
 
             // 時間切れのあとは選んだ先へ進まない（README 5.1）
             if (IsTimeUp)
@@ -510,28 +520,18 @@ public class DialogueManager : MonoBehaviour
         SetKeyGuide("入力したら「送信」を押してください");
     }
 
-    // 「やめる」ボタン（README 3.3）。書きかけの文章は捨て、同じノードの選択肢に戻る
+    // 「会話をやめる」ボタン（README 1.8・3.3）。書きかけの文章は捨てて会話を閉じる
+    // （条件Aでは自由入力の窓が出ないので、ここに来るのは条件Bだけ）
     public void OnClickCancelInput()
     {
         if (currentState != GameState.InTyping)
             return;
 
-        ExperimentLogger.Log("free_input_cancel", npcId: CurrentNpcId, nodeId: currentNodeId);
-
         inputPanel.SetActive(false);
         inputField.text = "";
         lastFailedInput = null;
 
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
-
-        if (IsTimeUp)
-        {
-            CloseDialogue();
-            return;
-        }
-
-        ShowChoicesFromNode();
+        CloseDialogue("end=quit_button");
     }
 
     private void HandleTypingInput()
@@ -593,10 +593,10 @@ public class DialogueManager : MonoBehaviour
     }
 
     // PromptData/S{話題セット番号}/ → NPCDialogue.promptData の順で探す（README 4.5）
-    // pathには見つかった場所（ログ用。例：S1/NPC005）が入る
+    // pathには見つかった場所（ログ用。例：S1/NPC005、チュートリアルではTutorial/TUT001）が入る
     private PromptData LoadPromptData(NPCDialogue npc, out string path)
     {
-        path = "S" + TopicSet + "/" + npc.npcId;
+        path = DataFolder + "/" + npc.npcId;
         PromptData prompt = Resources.Load<PromptData>("PromptData/" + path);
         if (prompt == null)
         {
@@ -615,18 +615,20 @@ public class DialogueManager : MonoBehaviour
         choicePanel.SetActive(false);
 
         dialogueText.text = JapaneseLineBreaker.Format(reply, dialogueText, maxDialogueLines);
+        TutorialGuide.Instance?.OnDialogueAction();
 
         nextIndicator.SetActive(true);
-        SetDialogueKeyGuide(currentNode.nextId < 0);
+        SetDialogueKeyGuide(!FreeInputOnly && currentNode.nextId < 0);
     }
 
     // =========================
     // Close
     // =========================
 
-    public void CloseDialogue()
+    public void CloseDialogue(string detail = null)
     {
-        ExperimentLogger.Log("dialogue_end", npcId: CurrentNpcId);
+        ExperimentLogger.Log("dialogue_end", npcId: CurrentNpcId, detail: detail);
+        TutorialGuide.Instance?.OnDialogueClosed(CurrentNpcId);
 
         currentState = GameState.FreeMove;
 
@@ -657,6 +659,15 @@ public class DialogueManager : MonoBehaviour
             questCompletePanel.SetActive(true);
 
         ExperimentLogger.EndSessionNow("time_up");
+    }
+
+    // チュートリアルの最後（「準備ができたら Enter」）。話しかけ・移動・設定パネルを止める（README 2.4）
+    public void LockForTutorialEnd()
+    {
+        currentState = GameState.Ended;
+
+        talkHint.SetActive(false);
+        StopPlayer();
     }
 
     // プレイヤーを止める。enabled=falseだけだと走りモーションと足音が続くため、速度も0にする
@@ -694,6 +705,7 @@ public class DialogueManager : MonoBehaviour
         settingsPanel.Open();
 
         ExperimentLogger.Log("settings_open");
+        TutorialGuide.Instance?.OnSettingsOpened();
     }
 
     private void HandleSettingsInput()
@@ -722,6 +734,7 @@ public class DialogueManager : MonoBehaviour
         SetTypingMode(false); // 移動再開・カーソル非表示
 
         currentState = GameState.FreeMove;
+        TutorialGuide.Instance?.OnSettingsClosed();
     }
 
     // 設定パネルの「初期位置に戻る」（README 3.8）。残り時間はそのまま

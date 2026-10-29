@@ -32,6 +32,7 @@ public class ExperimentLogger : MonoBehaviour
     private string condition;
     private int topicSet;
     private string startTime;
+    private bool isTutorial;
 
     // 集計（README 6.7）
     private int dialogueCount, choiceCount, freeInputCount, aiErrorCount, settingsOpenCount, respawnCount;
@@ -125,7 +126,7 @@ public class ExperimentLogger : MonoBehaviour
 
         var settings = ExperimentSettings.Instance;
         participantId = settings != null ? settings.participantId : "unknown";
-        condition = settings != null && settings.condition == DialogueCondition.B_ChoiceAndInput ? "B" : "A";
+        condition = settings != null && settings.condition == DialogueCondition.B_FreeInputOnly ? "B" : "A";
         topicSet = settings != null ? settings.topicSet : 0;
 
         var now = DateTime.Now;
@@ -136,7 +137,10 @@ public class ExperimentLogger : MonoBehaviour
         try
         {
             Directory.CreateDirectory(LogDirectory);
-            string fileName = SafeFileName(participantId) + "_" + condition + "_S" + topicSet + "_" + stamp + ".csv";
+            // チュートリアルは本番と別のファイルにする（README 2.4）
+            isTutorial = TutorialGuide.Active;
+            string fileName = SafeFileName(participantId) + "_" + condition + "_S" + topicSet + "_" + stamp +
+                (isTutorial ? "_tutorial" : "") + ".csv";
             string path = Path.Combine(LogDirectory, fileName);
 
             writer = new StreamWriter(path, false, new UTF8Encoding(true)) { AutoFlush = true };
@@ -327,6 +331,10 @@ public class ExperimentLogger : MonoBehaviour
 
     private void AppendSummary(string reason)
     {
+        // チュートリアルは集計しない（README 2.4）
+        if (isTutorial)
+            return;
+
         var header = new List<string>
         {
             "session_id", "participant_id", "condition", "set", "start_time", "end_reason", "total_play_time",
@@ -341,7 +349,8 @@ public class ExperimentLogger : MonoBehaviour
             sessionId, participantId, condition, topicSet.ToString(CultureInfo.InvariantCulture), startTime, reason,
             F(PlayTime), F(exploreStartTime), F(timeUpTime),
             dialogueCount.ToString(), choiceCount.ToString(), freeInputCount.ToString(), aiErrorCount.ToString(), F(aiWaitSeconds),
-            talkedNpcs.Count.ToString(), topicsHeard.Count.ToString(),
+            // 条件Bは話題を選択肢で聞かないので、0（1つも聞かなかった）と読まれないよう空欄にする（README 1.8）
+            talkedNpcs.Count.ToString(), condition == "B" ? "" : topicsHeard.Count.ToString(),
             settingsOpenCount.ToString(), respawnCount.ToString()
         };
         foreach (var id in NpcIds)

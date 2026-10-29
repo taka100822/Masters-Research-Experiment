@@ -635,7 +635,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ExperimentSettings
   participantId: P000
-  condition: 0
+  condition: 1
   topicSet: 1
 --- !u!114 &2089963
 MonoBehaviour:
@@ -20804,7 +20804,7 @@ RectTransform:
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: -164, y: -40}
-  m_SizeDelta: {x: 120, y: 48}
+  m_SizeDelta: {x: 160, y: 48}
   m_Pivot: {x: 1, y: 1}
 --- !u!114 &289549485
 MonoBehaviour:
@@ -87837,7 +87837,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u3084\u3081\u308B"
+  m_text: "\u4F1A\u8A71\u3092\u3084\u3081\u308B"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: c4e5194cbebf0aa42bee37acb922ee06, type: 2}
   m_sharedMaterial: {fileID: 7279387632360693155, guid: c4e5194cbebf0aa42bee37acb922ee06, type: 2}
@@ -132411,7 +132411,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 32, y: -40}
-  m_SizeDelta: {x: -328, y: 48}
+  m_SizeDelta: {x: -368, y: 48}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &1951340291
 MonoBehaviour:
