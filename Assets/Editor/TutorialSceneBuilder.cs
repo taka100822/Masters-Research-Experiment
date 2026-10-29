@@ -48,8 +48,13 @@ public static class TutorialSceneBuilder
             !EditorUtility.DisplayDialog("チュートリアル", TutorialScenePath + " を作り直します（今の中身は消えます）。", "作り直す", "やめる"))
             return;
 
-        AssetDatabase.DeleteAsset(TutorialScenePath);
-        if (!AssetDatabase.CopyAsset(MainScenePath, TutorialScenePath))
+        // 作り直すときは中身だけを上書きして、guid（ビルド設定が参照する）を変えない
+        if (AssetDatabase.LoadAssetAtPath<SceneAsset>(TutorialScenePath) != null)
+        {
+            System.IO.File.Copy(MainScenePath, TutorialScenePath, true);
+            AssetDatabase.ImportAsset(TutorialScenePath, ImportAssetOptions.ForceUpdate);
+        }
+        else if (!AssetDatabase.CopyAsset(MainScenePath, TutorialScenePath))
         {
             EditorUtility.DisplayDialog("チュートリアル", MainScenePath + " を複製できませんでした。", "OK");
             return;
@@ -57,6 +62,36 @@ public static class TutorialSceneBuilder
 
         var scene = EditorSceneManager.OpenScene(TutorialScenePath, OpenSceneMode.Single);
 
+        try
+        {
+            BuildScene(scene);
+        }
+        catch (System.Exception e)
+        {
+            // 作りかけのシーンは捨てる（MainSceneの複製のまま残ると、チュートリアルの代わりに村が開いてしまう）
+            Debug.LogException(e);
+            EditorSceneManager.OpenScene(MainScenePath, OpenSceneMode.Single);
+            AssetDatabase.DeleteAsset(TutorialScenePath);
+            EditorUtility.DisplayDialog("チュートリアル", "シーンを作れませんでした（TutorialSceneは消しました）。Consoleのエラーを見てください。\n" + e.Message, "OK");
+            return;
+        }
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+        AddToBuildSettings();
+
+        Debug.Log("[Tools] Tutorial scene built: " + TutorialScenePath);
+    }
+
+    // 名前が同じものがシーンの中に他にもある（村人の頭上の「Canvas」、スライダーの「Background」など）ので、
+    // 最上位のオブジェクトだけから探す
+    private static GameObject Root(UnityEngine.SceneManagement.Scene scene, string name)
+    {
+        return scene.GetRootGameObjects().FirstOrDefault(go => go.name == name);
+    }
+
+    private static void BuildScene(UnityEngine.SceneManagement.Scene scene)
+    {
         var player = Object.FindAnyObjectByType<ThirdPersonController>().transform;
         Vector3 origin = player.position;
         // 消す前の村の地面の高さに草地を置く（プレイヤーとカメラは動かさない）。プレイヤー自身の当たり判定は除く
@@ -72,21 +107,15 @@ public static class TutorialSceneBuilder
 
         foreach (var name in new[] { "Background", "WaterBlockers" })
         {
-            var go = GameObject.Find(name);
+            var go = Root(scene, name);
             if (go != null) Object.DestroyImmediate(go);
         }
 
         BuildGround(origin);
-        BuildNpcs(origin, forward, right);
+        BuildNpcs(Root(scene, "NPCs"), origin, forward, right);
         var guide = SetUpGameManager();
-        SetUpCanvas(guide);
+        SetUpCanvas(Root(scene, "Canvas"), guide);
         SetUpMinimap(origin);
-
-        EditorSceneManager.MarkSceneDirty(scene);
-        EditorSceneManager.SaveScene(scene);
-        AddToBuildSettings();
-
-        Debug.Log("[Tools] Tutorial scene built: " + TutorialScenePath);
     }
 
     // =========================
@@ -139,9 +168,8 @@ public static class TutorialSceneBuilder
     // 案内役の村人
     // =========================
 
-    private static void BuildNpcs(Vector3 origin, Vector3 forward, Vector3 right)
+    private static void BuildNpcs(GameObject root, Vector3 origin, Vector3 forward, Vector3 right)
     {
-        var root = GameObject.Find("NPCs");
         var all = root.GetComponentsInChildren<NPCDialogue>(true);
 
         foreach (var npc in all)
@@ -201,9 +229,9 @@ public static class TutorialSceneBuilder
     // 画面（説明画面・残り時間を消し、「やること」の札を足す）
     // =========================
 
-    private static void SetUpCanvas(TutorialGuide guide)
+    private static void SetUpCanvas(GameObject canvasRoot, TutorialGuide guide)
     {
-        var canvas = GameObject.Find("Canvas").transform;
+        var canvas = canvasRoot.transform;
 
         var intro = canvas.Find("IntroPanel");
         if (intro != null) intro.gameObject.SetActive(false);
@@ -311,11 +339,12 @@ public static class TutorialSceneBuilder
     private static void AddToBuildSettings()
     {
         var scenes = EditorBuildSettings.scenes.ToList();
-        if (scenes.Any(s => s.path == TutorialScenePath))
-            return;
+        int index = scenes.FindIndex(s => s.path == TutorialScenePath);
+        if (index >= 0)
+            scenes.RemoveAt(index);   // guidを今のものに入れ直す
+        else
+            index = Mathf.Min(1, scenes.Count);   // タイトルの次（1番）に入れる
 
-        // タイトルの次（1番）に入れる
-        int index = Mathf.Min(1, scenes.Count);
         scenes.Insert(index, new EditorBuildSettingsScene(TutorialScenePath, true));
         EditorBuildSettings.scenes = scenes.ToArray();
     }

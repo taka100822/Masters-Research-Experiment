@@ -76,6 +76,8 @@ public class TutorialGuide : MonoBehaviour
 
         if (guidePanel != null)
             guidePanel.SetActive(true);
+        else
+            Debug.LogError("[Tutorial] やることの札（guidePanel）がありません。Tools/研究用/チュートリアルのシーンを作り直す で作り直してください");
 
         ExperimentLogger.Log("tutorial_start", detail: "condition=" + (FreeInputOnly ? "B" : "A"));
         ShowStep(1);
