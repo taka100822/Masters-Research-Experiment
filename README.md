@@ -5,12 +5,12 @@
 > もとは初期の仕様書 `Document_chatGPT.md`（本文中では「元仕様書」）を実装と照合して書き直したもの。元仕様書は削除済みで、`git show ad08eb8:Assets/Document_chatGPT.md` で読める。
 >
 > 2026-10-09に、実験の課題をクエストから「村を5分間自由に探索する」に変えた（1.7）。
-> 2026-10-29に、条件Bを「選択肢＋自由入力」から「自由入力のみ」に変えた（1.8）。同じ日に、各プレイの前のチュートリアルを足した（2.4）。
+> 2026-10-29に、条件Bを「選択肢＋自由入力」から「自由入力のみ」に変えた（1.8）。同じ日に、各プレイの前のチュートリアルを足し（2.4）、プロンプトをスプレッドシートで編集するようにした（4.7）。
 >
 > | ファイル | 中身 |
 > |---|---|
 > | `README.md`（これ） | 今の仕様 |
-> | [`docs/topic-sets.md`](docs/topic-sets.md) | 話題セット1・2のセリフとプロンプトの全文 |
+> | [`docs/topic-sets.md`](docs/topic-sets.md) | 話題セット1・2のセリフの全文（プロンプトの全文はスプレッドシート。4.7） |
 > | [`docs/history.md`](docs/history.md) | 仕様を決めたときの問題・理由・研究への影響・確認結果（日付ごと） |
 
 ## 目次
@@ -168,7 +168,7 @@ MainScene：説明画面（3.7）→ Enter → 本番5分
 | `TUT002` | 旅人クリス | 右5m・前11m |
 
 * 見た目は本番の村人のモデルを使い、**今回の村では使わない方の衣装**（もう一方の話題セットの衣装）にする。例：話題セット1の回のケビンは、セット2のNPC001（大工シャック）の衣装
-* セリフ・プロンプトは村と関係のない軽い話（天気・広場・旅）。本番の村人の名前・居場所・話題には触れない。全文は[`docs/topic-sets.md`](docs/topic-sets.md#4-チュートリアル)
+* セリフ・プロンプトは村と関係のない軽い話（天気・広場・旅）。本番の村人の名前・居場所・話題には触れない。セリフの全文は[`docs/topic-sets.md`](docs/topic-sets.md#4-チュートリアル)、プロンプトの全文はスプレッドシート（4.7）
 
 **やること**（画面上部中央の「やること」の札。できたら「できました！」を出し、1秒後に次へ）
 
@@ -544,7 +544,7 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 * **APIキー**：`Assets/Resources/openai_key.txt`から読む（`.gitignore`済み。GitHubには上げない）
 * **モデル**：`ChatGPTClient.cs`の定数`model = "gpt-5.6-luna"`（2026-10-05に動作確認済み）。実験期間中は変えない（1.5）
 * **プロンプトの読み込み**：`PromptData/S{話題セット番号}/{npcId}` → `NPCDialogue.promptData` の順に探す（`DialogueManager.LoadPromptData()`）。どれも無ければ送信せず、NPCのセリフとして「……（今は話せないようだ）」を表示してConsoleにエラーを出す
-* **プロンプトの形式**：`PromptData`（ScriptableObject）の`systemPrompt`という1つの文字列。名前・性格・知っている情報などは、下のテンプレートに沿って文章の中に書く。全員（1セット6人×2セット＝12個）にある
+* **プロンプトの形式**：`PromptData`（ScriptableObject）の`systemPrompt`という1つの文字列。名前・性格・知っている情報などは、下のテンプレートに沿って文章の中に書く。全員（1セット6人×2セット＝12個）にある。中身はスプレッドシートで書いて取り込む（4.7）。Inspectorで直接直さない（次の取り込みでシートの内容に戻る）
 * **エラー**：通信の失敗・時間切れ（20秒）・返答の解析失敗・APIキーが無い、のどれでもゲームは止まらず、参加者向けの一文を表示する（4.6）
 
 **AIに守らせること**（プロンプトの文面で守らせる。コード側での検査はしていない）
@@ -597,6 +597,37 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 * エラーかどうかは、`ChatGPTClient.SendChatMessage`が返す`ChatResult`（`Success`／`Text`／`Error`）で判定する
 * **もう一度試す**：エラーのあとEnterを押すと、自由入力の窓に戻る。**失敗した文章が入力欄に残っている**ので、そのまま送信し直せる（成功したら入力欄は空に戻す。「会話をやめる」でも消す）
 * **ログ**：`ai_response`の`text`には参加者に表示した一文を、`detail`に失敗の理由を書く（`error=timeout`／`network`／`http_<コード>`／`parse`／`no_key`）。`is_error=1`
+
+## 4.7 プロンプトの編集（スプレッドシート）
+
+プロンプトはGoogleスプレッドシート「NPCプロンプト」（[リンク](https://docs.google.com/spreadsheets/d/1DpBEnJ_7bN44l1gGB1NgiLCCUcDbHpGMiggjoKVDg7M/edit)）で書き、**Unityのメニューから取り込んで`PromptData`アセットに入れる**。シートが正本で、ゲームは今までどおりアセットを読む（4.5）。経緯は[`docs/history.md`](docs/history.md#2026-10-29-プロンプトをスプレッドシートで編集する)。
+
+* **ゲームの実行中にはスプレッドシートを読まない**。取り込みはエディタで実験者が明示的に行う。実験で使った版はgitの`PromptData`アセットに残り、ログのハッシュ（6章）と照らし合わせられる
+* シートの共有は「**リンクを知っている全員が閲覧可**」にしておく（取り込みはログインなしでCSVを読むため）
+
+**シートの形**（タブ`prompts`、gid `0`。1行＝1人のプロンプト）
+
+| A：folder | B：npcId | C：名前（メモ用） | D：systemPrompt |
+|---|---|---|---|
+| `S1` | `NPC001` | 商人ヴィクター | あなたは村で雑貨屋を営む商人のヴィクターです。↵↵【性格】… |
+| … | … | … | … |
+| `Tutorial` | `TUT002` | 旅人クリス | … |
+
+* 1行目は見出し（固定表示）。D列にプロンプト全文を1つのセルに入れる（セル内の改行はそのまま改行になる。シート上では`Ctrl+Enter`／`Alt+Enter`で改行）
+* 今は`S1`・`S2`・`Tutorial`の14行。クエスト版の`Q1`・`Q2`は入れていない
+* C列は人が見るためだけで、取り込みでは使わない
+* A〜D列の書式は「書式なしテキスト」（数字や日付に変換されないように）
+* 見やすいように、見出しは深緑の地に白い太字、2行目以降は白と薄い緑を交互にしてある（A〜Z列の行全体、100行目まで。行を足しても色は付く）
+
+**取り込み**：メニュー **Tools → 研究用 → プロンプトをスプレッドシートから取り込む**（`PromptSheetImporter`、エディタ用。Play中は実行できない）
+
+1. シートをCSVで書き出すURL（`…/export?format=csv&gid=0`）から`UnityWebRequest`で読む（20秒で打ち切り）。読めない・CSVでない返事（閲覧権限が無いとログイン画面が返る）のときは、理由を窓に出して何もしない
+2. 各行について`Assets/Resources/PromptData/{folder}/{npcId}.asset`と比べる。改行コードは`
+`にそろえ、先頭・末尾の空白は消してから比べる
+3. 違う行があれば確認の窓を出す：変わる人の一覧（例：`S1/NPC003 1a2b3c4d → 9f8e7d6c`。ハッシュは6章と同じ`ExperimentLogger.Hash8`）と「実験期間中はプロンプトを変えないでください（README 1.5）」。「取り込む」を押したときだけ書き換えて保存する。アセットが無ければ新しく作る。シートに無いアセットは消さない
+4. 終わったらConsoleに`[PromptSheet] 変更 2・新規 0・同じ 12`のように出す。変わった人ごとに新しいハッシュも出す。何も変わらなければ「変わったプロンプトはありません」の窓だけ出す
+* folder・npcIdが両方空の行は飛ばす。folderが`S1`／`S2`／`Tutorial`以外・npcIdが空・npcIdが重複・systemPromptが空の行は取り込まずにConsoleに警告を出す
+* シートのID・gidは`PromptSheetImporter`の定数（`SheetId`・`SheetGid`）
 
 ---
 
@@ -883,6 +914,7 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 | `GameState`（enum） | 4.1 |
 | `SceneBuildTools`（エディタ用） | メニュー「Tools/研究用」：水の壁を作り直す・ミニマップの地図を撮り直す |
 | `TutorialSceneBuilder`（エディタ用） | メニュー「Tools/研究用」：チュートリアルのシーンを作り直す（2.4） |
+| `PromptSheetImporter`（エディタ用） | メニュー「Tools/研究用」：プロンプトをスプレッドシートから取り込む（4.7） |
 | `QuestData`（ScriptableObject）・`QuestManager`・`QuestPanelUI` | **使っていない**（クエスト版。1.7）。シーンからは外し、ファイルとデータ（`Resources/Quest/`）だけ残している |
 
 ---
@@ -897,7 +929,7 @@ Claude Codeが本仕様書を参照し、Unity MCP経由で開発する。
 2. ユーザーが確認・承認する
 3. 承認後に実装する（1ファイルずつ）
 4. 実装したら、READMEには**今の仕様**（どう動くか・見た目・実装の構成）だけを残し、問題・理由・研究への影響・確認結果は[`docs/history.md`](docs/history.md)に日付を付けて移す
-5. セリフ・プロンプトを変えたときは[`docs/topic-sets.md`](docs/topic-sets.md)とデータ（CSV・`PromptData`）の両方を直す
+5. セリフを変えたときは[`docs/topic-sets.md`](docs/topic-sets.md)と会話CSVの両方を直す。プロンプトはスプレッドシートを直してから取り込む（4.7）
 
 ## 9.2 基本ルール
 
