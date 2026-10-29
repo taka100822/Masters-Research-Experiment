@@ -28,6 +28,8 @@ public class TutorialGuide : MonoBehaviour
     [SerializeField] private float walkDistance = 3f;
     [Tooltip("できたことを見せてから次へ進むまでの秒数（実時間）")]
     [SerializeField] private float advanceDelay = 1f;
+    [Tooltip("札の高さの最小値。文が長いときは行数に合わせて伸びる")]
+    [SerializeField] private float minPanelHeight = 72f;
 
     private const string KeyColor = "#E0B354";
     private const int LastStep = 6;
@@ -180,24 +182,25 @@ public class TutorialGuide : MonoBehaviour
         string first = NpcName(firstNpcId, "ケビン");
         string second = NpcName(secondNpcId, "クリス");
 
+        // 改行は文の切れ目に手で入れる。1行は全角30字まで（札の幅672px・20pxで約33字。README 2.4）
         switch (n)
         {
             case 1:
-                return Key("W") + Key("A") + Key("S") + Key("D") + " で歩いてみましょう。マウスで見回せます";
+                return Key("W") + Key("A") + Key("S") + Key("D") + " で歩いてみましょう。\nマウスで見回せます";
             case 2:
-                return "右上の地図の白い丸が村人です。" + first + "に近づいて " + Key("Enter") + " で話しかけましょう";
+                return "右上の地図の白い丸が村人です。\n" + first + "に近づいて " + Key("Enter") + " で話しかけましょう";
             case 3:
                 return FreeInputOnly
-                    ? "話したいことを書いて「送信」を押しましょう。返事を読んだら「会話をやめる」で終えます"
-                    : Key("↑") + Key("↓") + " で選んで " + Key("Enter") + " で決めましょう。会話を最後まで進めます";
+                    ? "話したいことを書いて「送信」を押しましょう。\n返事を読んだら「会話をやめる」で終えます"
+                    : Key("↑") + Key("↓") + " で選んで " + Key("Enter") + " で決めましょう。\n会話を最後まで進めます";
             case 4:
                 return FreeInputOnly
-                    ? second + "にも話しかけて、何か聞いてみましょう。終わったら「会話をやめる」"
-                    : second + "にも話しかけて、会話を最後まで進めましょう";
+                    ? second + "にも話しかけて、何か聞いてみましょう。\n終わったら「会話をやめる」で終えます"
+                    : second + "にも話しかけて、\n会話を最後まで進めましょう";
             case 5:
-                return Key("Q") + " で設定を開けます。音の大きさを変えたり、動けなくなったときに「初期位置に戻る」を押したりできます。開いて閉じてみましょう";
+                return Key("Q") + " で設定を開けます。音の大きさを変えたり、\n動けなくなったときに「初期位置に戻る」を押したりできます。\n開いて閉じてみましょう";
             default:
-                return "本番では右上に残り時間が出て、5分たつと自動で終わります。準備ができたら " + Key("Enter");
+                return "本番では右上に残り時間が出て、5分たつと自動で終わります。\n準備ができたら " + Key("Enter");
         }
     }
 
@@ -238,10 +241,21 @@ public class TutorialGuide : MonoBehaviour
         SceneManager.LoadScene(TitleMenuUI.MainSceneName);
     }
 
+    // 文節の途中では折り返さない（README 3.4と同じ処理）。札の高さは行数に合わせて伸ばす
     private void SetText(string text)
     {
-        if (guideText != null)
-            guideText.text = text;
+        if (guideText == null)
+            return;
+
+        guideText.text = JapaneseLineBreaker.Format(text);
+
+        if (guidePanel != null && guidePanel.transform is RectTransform panel)
+        {
+            guideText.ForceMeshUpdate();
+            float padding = -guideText.rectTransform.sizeDelta.y;   // 札と文字の上下の余白の合計
+            float height = Mathf.Max(minPanelHeight, guideText.preferredHeight + padding);
+            panel.sizeDelta = new Vector2(panel.sizeDelta.x, height);
+        }
     }
 
     private static string Key(string key)
