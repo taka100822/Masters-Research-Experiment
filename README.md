@@ -130,13 +130,12 @@ Unityバージョン・AIモデル・API仕様・NPCプロンプト・会話デ�
 |---|---|
 | WASD | 移動 |
 | マウス | カメラ操作 |
-| Space | ジャンプ |
 | Enter | 説明画面を閉じる／話しかける／会話を進める／選択肢を決定する |
 | ↑ ↓ | 選択肢を選ぶ |
 | Q | 設定パネルを開く・閉じる（探索中のみ） |
 | マウスクリック | 自由入力の「送信」（空欄では押せない）・「会話をやめる」ボタン・設定パネル・タイトル画面の操作 |
 
-移動・カメラは Starter Assets Third Person Controller（購入アセット）の標準入力。会話まわりの入力は`DialogueManager`が`Keyboard.current`を直接見ている。
+移動・カメラは Starter Assets Third Person Controller（購入アセット）の標準入力。ジャンプはこのゲームに要らないので無くしてある（Spaceを押しても何も起きない。7.3）。会話まわりの入力は`DialogueManager`が`Keyboard.current`を直接見ている。
 
 ## 2.4 チュートリアル
 
@@ -815,7 +814,7 @@ session_id,participant_id,condition,set,start_time,end_reason,total_play_time,ex
 
 * 見た目は購入アセットの`Axe_Warrior`を`PlayerArmature`の子として使う。モデルの横位置は回転の中心に合わせてある（`localPosition.x = 0`。ずれていると片足を軸に回っているように見える）
 * カメラは`PlayerFollowCamera`（`Cinemachine3rdPersonFollow`）。`CameraSide = 0.5`でキャラクターを画面の中央に映す（0.5〜1にすると右肩越しの視点になる）
-* `ThirdPersonController.cs`（購入アセット）は、このプロジェクト用に手を入れてある（足音まわり・`StopMotion()`）。7.7を参照
+* `ThirdPersonController.cs`（購入アセット）は、このプロジェクト用に手を入れてある（足音まわり・`StopMotion()`・ジャンプを無くす）。ジャンプは`JumpAndGravity()`の中の「Jump」の`if`ブロックを消して無くしている（落下と重力の処理はそのまま）。7.7を参照
 
 ## 7.4 音
 
@@ -849,7 +848,7 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 | もの | 理由 | 別のPCで開くとき |
 |---|---|---|
 | `Assets/PurchasedAssets/`（Village・Starter Assets・キャラクター・Simple Skyなど） | 購入アセットなので`.gitignore`で除外 | 同じアセットをインポートして`Assets/PurchasedAssets/`に置く（Simple Skyは`Assets/PurchasedAssets/SimpleSky/`） |
-| `ThirdPersonController.cs`への変更（`StopMotion()`など） | 上のフォルダの中にあるため | 同じメソッドを手で追加する（無いと`DialogueManager`がコンパイルエラーになる） |
+| `ThirdPersonController.cs`への変更（`StopMotion()`・ジャンプを無くすなど） | 上のフォルダの中にあるため | 同じ変更を手で入れる（`StopMotion()`が無いと`DialogueManager`がコンパイルエラーになる。ジャンプは7.3のとおり消す） |
 | `Assets/Resources/openai_key.txt` | APIキー | 自分のAPIキーを書いたファイルを置く |
 | `Assets/ExperimentLogs/`（エディタで記録したログ） | 実験データ | — |
 
