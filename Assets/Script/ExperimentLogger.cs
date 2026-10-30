@@ -24,6 +24,44 @@ public class ExperimentLogger : MonoBehaviour
             ? Path.Combine(Application.dataPath, "ExperimentLogs")
             : Path.Combine(Directory.GetParent(Application.dataPath).FullName, "ExperimentLogs");
 
+    // 保存先に書き込めるか。短いファイルを書いてすぐ消す（開発者用モーダルの確認。README 3.1）
+    public static bool CanWrite(out string error)
+    {
+        try
+        {
+            Directory.CreateDirectory(LogDirectory);
+            string path = Path.Combine(LogDirectory, ".write_check_" + Guid.NewGuid().ToString("N") + ".tmp");
+            File.WriteAllText(path, "check");
+            File.Delete(path);
+            error = null;
+            return true;
+        }
+        catch (Exception e)
+        {
+            error = e.Message;
+            return false;
+        }
+    }
+
+    // そのIDの本番のログの数（チュートリアルは数えない）。IDの打ち間違いに気づくため（README 3.1）
+    // P1とP10を取り違えないよう、IDの後ろの「_」まで含めて比べる
+    public static int CountSessionLogs(string participantId)
+    {
+        if (string.IsNullOrEmpty(participantId) || !Directory.Exists(LogDirectory))
+            return 0;
+
+        string prefix = SafeFileName(participantId) + "_";
+        int count = 0;
+        foreach (string path in Directory.GetFiles(LogDirectory, "*.csv"))
+        {
+            string name = Path.GetFileName(path);
+            if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+                !name.EndsWith("_tutorial.csv", StringComparison.OrdinalIgnoreCase))
+                count++;
+        }
+        return count;
+    }
+
     private StreamWriter writer;
     private bool sessionEnded;
 

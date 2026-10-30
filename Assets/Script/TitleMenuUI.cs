@@ -40,6 +40,10 @@ public class TitleMenuUI : MonoBehaviour
     private static readonly Color AICheckPendingColor = new Color32(0xB9, 0xA8, 0x8E, 0xFF);  // 煤
     private bool aiChecking;
 
+    // ログの保存先に書き込めるかを確かめる（README 3.1）。未設定なら何もしない
+    [Header("ログ保存")]
+    [SerializeField] private TMP_Text logCheckText;
+
     private void Start()
     {
         // MainSceneではStarter Assetsがカーソルを固定するので、タイトルでは必ず表示する
@@ -50,7 +54,11 @@ public class TitleMenuUI : MonoBehaviour
         startButton.onClick.AddListener(OnClickStart);
         developerButton.onClick.AddListener(OpenDeveloperModal);
         closeButton.onClick.AddListener(CloseDeveloperModal);
-        participantIdInput.onValueChanged.AddListener(_ => UpdateGroupInfo());
+        participantIdInput.onValueChanged.AddListener(_ =>
+        {
+            UpdateGroupInfo();
+            UpdateExistingLogWarning();
+        });
         if (cancelButton != null)
             cancelButton.onClick.AddListener(CancelDeveloperModal);
         if (aiCheckButton != null)
@@ -81,8 +89,8 @@ public class TitleMenuUI : MonoBehaviour
     {
         participantIdInput.text = ExperimentConfig.ParticipantId;
         roundDropdown.SetValueWithoutNotify(ExperimentConfig.Round - 1);
-        errorText.text = "";
         UpdateGroupInfo();
+        UpdateExistingLogWarning();
         if (logPathText != null)
             logPathText.text = "ログ保存先：" + ExperimentLogger.LogDirectory;
 
@@ -91,6 +99,33 @@ public class TitleMenuUI : MonoBehaviour
 
         // 開くたびに自動で1回確かめる（確かめ忘れないように）
         CheckAIConnection();
+        CheckLogWrite();
+    }
+
+    // 書き込めなければ、ビルドを書き込める場所へ移す（README 3.1）
+    private void CheckLogWrite()
+    {
+        if (logCheckText == null)
+            return;
+
+        if (ExperimentLogger.CanWrite(out string error))
+        {
+            logCheckText.color = AICheckOkColor;
+            logCheckText.text = "OK";
+        }
+        else
+        {
+            logCheckText.color = errorText.color;
+            logCheckText.text = "失敗：このフォルダに書き込めません";
+            Debug.LogWarning("[Log Check] failed: " + error);
+        }
+    }
+
+    // 同じIDの本番のログが既にあれば知らせる。「2回目から」のやり直しもあるので止めない（README 3.1）
+    private void UpdateExistingLogWarning()
+    {
+        int count = ExperimentLogger.CountSessionLogs(participantIdInput.text.Trim());
+        errorText.text = count > 0 ? "注意：このIDの本番のログが既に" + count + "件あります" : "";
     }
 
     // テストの問い合わせを送り、結果をモーダルに出す。実験ログには書かない（README 3.1）
