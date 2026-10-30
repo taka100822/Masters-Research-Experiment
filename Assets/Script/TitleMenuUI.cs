@@ -28,6 +28,18 @@ public class TitleMenuUI : MonoBehaviour
     [Tooltip("モーダル表示中に隠すもの（タイトル文字・はじめるボタンが窓の後ろからはみ出して見えないように）")]
     [SerializeField] private GameObject[] hideWhileModalOpen;
 
+    // AIへの接続を確かめる（README 3.1）。未設定なら何もしない
+    [Header("AI接続")]
+    [SerializeField] private ChatGPTClient chatGPT;
+    [SerializeField] private TMP_Text aiCheckText;
+    [SerializeField] private Button aiCheckButton;   // 「もう一度」
+
+    private const string AICheckSystemPrompt = "接続の確認です。「OK」とだけ答えてください。";
+    private const string AICheckInput = "確認";
+    private static readonly Color AICheckOkColor = new Color32(0xF6, 0xEE, 0xDC, 0xFF);       // 漆喰
+    private static readonly Color AICheckPendingColor = new Color32(0xB9, 0xA8, 0x8E, 0xFF);  // 煤
+    private bool aiChecking;
+
     private void Start()
     {
         // MainSceneではStarter Assetsがカーソルを固定するので、タイトルでは必ず表示する
@@ -41,6 +53,8 @@ public class TitleMenuUI : MonoBehaviour
         participantIdInput.onValueChanged.AddListener(_ => UpdateGroupInfo());
         if (cancelButton != null)
             cancelButton.onClick.AddListener(CancelDeveloperModal);
+        if (aiCheckButton != null)
+            aiCheckButton.onClick.AddListener(CheckAIConnection);
 
         developerModal.SetActive(false);
         errorText.text = "";
@@ -74,6 +88,57 @@ public class TitleMenuUI : MonoBehaviour
 
         developerModal.SetActive(true);
         SetTitleContentVisible(false);
+
+        // 開くたびに自動で1回確かめる（確かめ忘れないように）
+        CheckAIConnection();
+    }
+
+    // テストの問い合わせを送り、結果をモーダルに出す。実験ログには書かない（README 3.1）
+    private async void CheckAIConnection()
+    {
+        // 送信中なら2つ目は送らず、前の結果を待つ
+        if (chatGPT == null || aiCheckText == null || aiChecking)
+            return;
+
+        aiChecking = true;
+        aiCheckText.color = AICheckPendingColor;
+        aiCheckText.text = "確認しています…";
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var result = await chatGPT.SendChatMessage(AICheckInput, AICheckSystemPrompt);
+        stopwatch.Stop();
+
+        // 待っている間に「はじめる」で別のシーンへ移ったら、結果は捨てる
+        if (this == null)
+            return;
+        aiChecking = false;
+
+        string seconds = (stopwatch.ElapsedMilliseconds / 1000f).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+        if (result.Success)
+        {
+            aiCheckText.color = AICheckOkColor;
+            aiCheckText.text = "OK（" + seconds + "秒）";
+            Debug.Log("[AI Check] ok " + seconds + "s");
+        }
+        else
+        {
+            aiCheckText.color = errorText.color;
+            aiCheckText.text = "失敗：" + AICheckErrorText(result.Error);
+            Debug.LogWarning("[AI Check] failed: " + result.Error);
+        }
+    }
+
+    private static string AICheckErrorText(string error)
+    {
+        switch (error)
+        {
+            case "no_key": return "APIキーのファイルがありません";
+            case "http_401": return "APIキーが正しくありません";
+            case "http_429": return "使用上限か混雑です（429）";
+            case "timeout": return "20秒待っても返事がありません";
+            case "network": return "ネットにつながっていません";
+            default: return error;
+        }
     }
 
     private void CloseDeveloperModal()

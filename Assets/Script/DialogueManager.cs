@@ -573,6 +573,10 @@ public class DialogueManager : MonoBehaviour
         if (!Keyboard.current.enterKey.wasPressedThisFrame)
             return;
 
+        // AIの返事を待っている間（入力の窓が隠れている間）は何もしない（README 3.3）
+        if (!inputPanel.activeSelf)
+            return;
+
         // 変換を確定するEnterは無視する（このフレームか1つ前に変換中の文字があった）
         if (imeComposing || Time.frameCount - lastImeCompositionFrame <= 1)
             return;
