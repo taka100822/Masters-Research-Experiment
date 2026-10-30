@@ -56,6 +56,11 @@ public class DialogueManager : MonoBehaviour
     private bool imeComposing;
     private int lastImeCompositionFrame = -10;
 
+    // セリフを表示した音・選択肢を上下で動かした音（README 7.4.3）
+    [Header("SE")]
+    [SerializeField] private AudioSource displayDialogSE;
+    [SerializeField] private AudioSource changeChoiceSE;
+
     [Header("Player")]
     [SerializeField] private ThirdPersonController playerController;
 
@@ -375,6 +380,7 @@ public class DialogueManager : MonoBehaviour
 
         dialogueText.text = JapaneseLineBreaker.Format(currentNode.text, dialogueText, maxDialogueLines);
         nameText.text = currentNPC != null ? currentNPC.DisplayName : "";
+        PlaySE(displayDialogSE);
 
         ExperimentLogger.Log("npc_line", npcId: CurrentNpcId, nodeId: currentNodeId, text: currentNode.text);
 
@@ -533,6 +539,8 @@ public class DialogueManager : MonoBehaviour
 
     private void HandleChoiceInput()
     {
+        int previousIndex = choiceIndex;
+
         if (Keyboard.current.upArrowKey.wasPressedThisFrame)
         {
             choiceIndex--;
@@ -546,6 +554,10 @@ public class DialogueManager : MonoBehaviour
             if (choiceIndex >= choices.Count) choiceIndex = 0;
             UpdateChoiceUI();
         }
+
+        // 選択肢が1つでカーソルが動かないときは鳴らさない（README 7.4.3）
+        if (choiceIndex != previousIndex)
+            PlaySE(changeChoiceSE);
 
         if (ChoiceSubmitPressed())
         {
@@ -564,6 +576,16 @@ public class DialogueManager : MonoBehaviour
 
             choices[choiceIndex].onSelect?.Invoke();
         }
+    }
+
+    // 続けて鳴らしたときは重ねず、頭から鳴らし直す（README 7.4.3）
+    private static void PlaySE(AudioSource se)
+    {
+        if (se == null)
+            return;
+
+        se.Stop();
+        se.Play();
     }
 
     // =========================
@@ -770,6 +792,7 @@ public class DialogueManager : MonoBehaviour
         choicePanel.SetActive(false);
 
         dialogueText.text = JapaneseLineBreaker.Format(reply, dialogueText, maxDialogueLines);
+        PlaySE(displayDialogSE);
         TutorialGuide.Instance?.OnDialogueAction();
 
         nextIndicator.SetActive(true);

@@ -1031,6 +1031,7 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 | SE | `Player/PlayerArmature/Audio/`の`Footstep_Concrete`・`Footstep_Land` | 足音・着地音 |
 | SE | MainSceneの`GameManager`の子`TimeUpSE`。`Assets/Audio/TimeUp.mp3` | 時間切れの音（5.1）。`ExplorationTimer`が時間切れの瞬間に1回鳴らす。ループなし・起動時に再生しない・2D。読み込みはDecompress On Load |
 | SE | 3シーンのルートの`UIClickSound`。`Assets/Audio/Click.mp3` | ボタンのクリック音（7.4.2）。シーンをまたいでも途切れないよう`DontDestroyOnLoad`の`AudioSource`で鳴らす。読み込みはDecompress On Load |
+| SE | MainScene・TutorialSceneの`DialogueManager`の子`DisplayDialogSE`・`ChangeChoiceSE`。`Assets/Audio/DisplayDialog.mp3`・`ChangeChoice.mp3` | セリフを表示した音・選択肢を上下で動かした音（7.4.3）。ループなし・起動時に再生しない・2D。読み込みはDecompress On Load |
 
 * 初期値はBGM・SEとも80%。保存しない（1.4）
 * 新しい音を足すときは、その`AudioSource`に`VolumeChannel`を付ける（クリック音だけは例外。7.4.2）
@@ -1070,6 +1071,21 @@ SEごとの音量の差（足音が大きすぎる、時間切れの音が小さ
 * **音量**：ほかのSEと同じく「**標準音量（`SEVolumeTable`）× 効果音の設定音量**」。`VolumeChannel`はシーンごとの`AudioVolumeSettings`に結び付くので使わず、鳴らす瞬間に`AudioVolumeSettings.Instance`から同じ計算で求める
   * TitleSceneにも`AudioVolumeSettings`を置いている（同じ`SEVolumeTable.asset`。設定パネルが無いのでSEは初期値の80%のまま）
   * `SEVolumeTable`の`Click.mp3`の標準音量は1.0
+
+### 7.4.3 会話のSE
+
+会話中に、セリフが出たときと、選択肢のカーソルを動かしたときに短いSEを鳴らす。MainScene・TutorialScene共通。条件A・Bとも同じ。
+
+| 音 | 鳴らすとき | 鳴らさないとき |
+|---|---|---|
+| `DisplayDialog.mp3` | NPCのセリフを会話窓に出したとき（話しかけた最初のセリフ・Enterで次のノードへ進んだとき・選択肢を選んだ先のセリフ）。条件BでAIの返答、またはエラーの一文（4.6）を出したとき | 返事を待つ間の`……`の点の切り替え（4.6）。会話を閉じるとき |
+| `ChangeChoice.mp3` | 選択肢が出ている間に`↑`／`↓`でカーソルを動かしたとき（端から反対の端へ回り込むときも） | 選択肢が1つしか無くてカーソルが動かないとき。Enterで決めたとき（決めた先でセリフが出るので`DisplayDialog`が鳴る） |
+
+* セリフと選択肢が同時に出るノードでは、`DisplayDialog`だけが鳴る
+* 続けて押したときは、鳴っている音を止めて頭から鳴らし直す（重ねない）
+* **音量**：ほかのSEと同じく`VolumeChannel`（SE）を付け、`SEVolumeTable`に2行足した（標準音量はどちらも1.0から始めて、聞きながら調整する）
+* **実装**：`DialogueManager`に`displayDialogSE`・`changeChoiceSE`（`AudioSource`）を足す。`ShowNode`・`ShowAIResponse`で`displayDialogSE.Play()`、`HandleChoiceInput`の上下で`changeChoiceSE.Play()`。両シーンの`DialogueManager`の子に`AudioSource`を2つ置いて割り当てる
+* **研究への影響**：なし（ログ・会話の中身は変わらない。音が増えるだけ）
 
 ## 7.5 空とライティング
 

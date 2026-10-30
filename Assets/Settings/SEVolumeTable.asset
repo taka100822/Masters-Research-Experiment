@@ -21,3 +21,7 @@ MonoBehaviour:
     volume: 0.2
   - sound: {fileID: 8300000, guid: c7e36c01a574582498018c58a945f96d, type: 3}
     volume: 1
+  - sound: {fileID: 8300000, guid: d58a11bb590f60044b1ecec078891322, type: 3}
+    volume: 1
+  - sound: {fileID: 8300000, guid: 105fce9a08ab7f3439e1ca96031716b7, type: 3}
+    volume: 1
