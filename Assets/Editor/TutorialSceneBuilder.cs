@@ -254,7 +254,7 @@ public static class TutorialSceneBuilder
         rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
         rt.pivot = new Vector2(0.5f, 1f);
         rt.anchoredPosition = new Vector2(0f, -16f);
-        rt.sizeDelta = new Vector2(720f, 96f);
+        rt.sizeDelta = new Vector2(840f, 96f);
 
         var text = panel.GetComponentInChildren<TMP_Text>(true);
         text.name = "GuideText";
@@ -265,7 +265,7 @@ public static class TutorialSceneBuilder
         trt.offsetMax = new Vector2(-24f, -10f);
         text.textWrappingMode = TextWrappingModes.Normal;
         text.alignment = TextAlignmentOptions.Center;
-        text.fontSize = 20f;
+        text.fontSize = 26f;
         text.text = "";
 
         var so = new SerializedObject(guide);

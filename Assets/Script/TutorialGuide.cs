@@ -29,7 +29,7 @@ public class TutorialGuide : MonoBehaviour
     [Tooltip("できたことを見せてから次へ進むまでの秒数（実時間）")]
     [SerializeField] private float advanceDelay = 1f;
     [Tooltip("札の高さの最小値。文が長いときは行数に合わせて伸びる")]
-    [SerializeField] private float minPanelHeight = 72f;
+    [SerializeField] private float minPanelHeight = 88f;
 
     private const string KeyColor = "#E0B354";
     private const int LastStep = 6;
@@ -208,7 +208,7 @@ public class TutorialGuide : MonoBehaviour
         string first = NpcName(firstNpcId, "ケビン");
         string second = NpcName(secondNpcId, "クリス");
 
-        // 改行は文の切れ目に手で入れる。1行は全角30字まで（札の幅672px・20pxで約33字。README 2.4）
+        // 改行は文の切れ目に手で入れる。1行は全角30字まで（文字の幅792px・26pxで約30字。README 2.4）
         switch (n)
         {
             case 1:
