@@ -128,7 +128,7 @@ Unityバージョン・AIモデル・API仕様・NPCプロンプト・会話デ�
 
 1人が2回（条件A・Bを1回ずつ）遊ぶ。2回目のアンケートのあとは、おわりの画面（操作不可）で止まる。
 
-プレイ中はいつでも`Q`で設定パネルを開ける（探索中のみ）。設定パネルを開いている間は残り時間も止まる。設定パネルから「タイトルへ戻る」と、進み具合（残り時間を含む）はリセットされる。
+プレイ中はいつでも`Q`で設定パネルを開ける（探索中のみ）。設定パネルを開いている間は残り時間も止まる。参加者がタイトルへ戻る手段は無い。実験者だけが開発者用コマンド（`Ctrl+Shift+T`。2.5）でタイトルへ戻せ、そのとき進み具合（残り時間を含む）はリセットされる。
 
 ## 2.3 操作
 
@@ -254,7 +254,15 @@ MainScene：説明画面（3.7）→ Enter → 本番5分
 * アンケートは同じPCのGoogleフォーム「ゲーム体験アンケート」（ゲームの外）で答える。アンケート画面の「アンケートを開く」で、プレイヤーIDと回が入った状態のフォームがブラウザで開く（3.7）。回答も、アンケート画面での操作もログに書かない（本番のログは時間切れの`session_end`で閉じているため）
 * アプリは同時に1つしか起動しない（Player Settingsの「Force Single Instance」。2つ起動すると同じ`summary.csv`に両方が書くため）
 * ログのファイルは1回のプレイごと（6章）。1人分で本番2つ＋チュートリアル2つ。`session_start`・`tutorial_start`の`detail`に`round=1`／`2`が入る
-* 途中で落ちた・やり直すときは、開発者用モーダルの「始める回」で「2回目から」を選ぶ（3.1）。設定パネルの「タイトルへ戻る」（3.8）では参加者ID・回が残るので、そのまま「はじめる」でその回を最初（チュートリアル）からやり直せる
+* 途中で落ちた・やり直すときは、開発者用モーダルの「始める回」で「2回目から」を選ぶ（3.1）。開発者用コマンドでタイトルへ戻ったとき（下）は参加者ID・回が残るので、そのまま「はじめる」でその回を最初（チュートリアル）からやり直せる
+
+**開発者用コマンド：タイトルへ戻る**
+
+* `Ctrl+Shift+T`を押すと、確認なしで`back_to_title`でログを閉じてTitleSceneへ戻る（残り時間も含めて最初から。参加者ID・回は残る）
+* 効くのはTutorialSceneとMainSceneで、**どの状態でも**（説明画面・会話中・選択肢中・自由入力中・設定パネル表示中・アンケート画面・おわりの画面）。自由入力中でも欄に文字は入らない（`Ctrl`を押しながらなので）
+* 画面のどこにも書かない（参加者に見せないため。以前は設定パネルにボタンがあったが外した。3.8）。3つ同時押しなので、参加者が誤って押すことはまず無い
+* アンケート画面・おわりの画面では、本番のログは時間切れの`session_end`（`time_up`）で閉じているので、ログには何も足さない
+* 実装：`DialogueManager.Update()`の頭で`Keyboard.current`の`ctrlKey`・`shiftKey`が押されていて`tKey.wasPressedThisFrame`なら`BackToTitle()`（`ExperimentLogger.EndSessionNow("back_to_title")`→`Time.timeScale = 1`→`SceneManager.LoadScene("TitleScene")`）。以前`SettingsPanelUI.OnClickTitle()`がしていた処理を移す
 * おわりの画面にはボタンが無い。実験者はアプリを閉じ、次の参加者は起動し直してIDを入れる
 
 **実装**：`ExperimentConfig`が参加者ID・回（`Round`）を持ち、条件・話題セットはIDと回から計算する（`GroupOf`・`ConditionOf`・`TopicSetOf`）。アンケート画面の「はい」で`EndScreenUI`が`ExperimentConfig.AdvanceToSecondRound()`を呼んでTutorialSceneを開く
@@ -532,7 +540,7 @@ TextMeshProは日本語を1文字ごとにどこでも折り返すので、そ�
   * 入れるのは「プレイヤーID」＝参加者ID（`ExperimentSettings.participantId`）と「何回目のプレイですか？」＝`1回目`／`2回目`（`ExperimentConfig.Round`。エディタでMainSceneを直接Playしたときは`1回目`）だけ。**条件・話題セットは入れない**（参加者の目に入るため。3.1と同じ考え）
   * URL：`https://docs.google.com/forms/d/e/1FAIpQLSch5ArOd7LTy5Y08wKCqhAbPFtd0PiVjQHsY3Fz0iQ8rceuVQ/viewform?usp=pp_url&entry.1776098365={ID}&entry.1533040520={回}`（値はURLエンコード）。フォームの質問を作り直すと`entry.`の番号が変わるので、そのときは`EndScreenUI`の定数（`FormUrl`・`IdEntry`・`RoundEntry`）を直す
   * 事前入力した欄は参加者が書き換えられる。フォーム側で、その2つの質問に「この欄は変えないでください」と書いておく
-* **アンケート回答完了**（`CompleteButton`）：枠線だけ。押すと、ボタンの所が確認に切り替わる（3.8の「タイトルへ戻る」と同じやり方）。「アンケートの回答は終わりましたか？　[ いいえ ] [ はい ]」（いいえ＝枠線、はい＝真鍮の地。240×64・24px）。間違って押してもすぐ進まないように
+* **アンケート回答完了**（`CompleteButton`）：枠線だけ。押すと、ボタンの所が確認に切り替わる（別の窓は出さない）。「アンケートの回答は終わりましたか？　[ いいえ ] [ はい ]」（いいえ＝枠線、はい＝真鍮の地。240×64・24px）。間違って押してもすぐ進まないように
 * **はい**：1回目なら2回目のチュートリアル（TutorialScene）へ（2.5）。2回目なら、同じ全画面の文を「以上で終わりです　ご協力ありがとうございました。実験者の指示があるまでお待ちください。」に替え、ボタンを消す（**おわりの画面**。操作不可）
 * エディタでMainSceneを直接Playしたときは、「はい」でおわりの画面になる
 * 文は`EndScreenUI`（`QuestCompletePanel`に付ける）が表示のたびに入れる。シーンの`CompleteText`の文は使わない
@@ -550,7 +558,7 @@ TextMeshProは日本語を1文字ごとにどこでも折り返すので、そ�
 ░░  │ 効果音      ━━━━━━━━━━●━━━   80%      │  ░░
 ░░  │ 視点の速さ  ━━━━●━━━━━━━━━   1.0      │  ░░
 ░░  │                                      │  ░░
-░░  │ [ 初期位置に戻る ] [ タイトルへ戻る ]  │  ░░  ← どちらも枠線だけ
+░░  │ [ 初期位置に戻る ]                    │  ░░  ← 枠線だけ
 ░░  │ 動けなくなったときは「初期位置に戻る」   │  ░░  ← 煤色の小さな説明
 ░░  │                                      │  ░░
 ░░  │                       [ 閉じる [Q] ]  │  ░░  ← 真鍮の地（主な操作）
@@ -565,21 +573,11 @@ TextMeshProは日本語を1文字ごとにどこでも折り返すので、そ�
 * **初期位置に戻る**：ゲーム開始時の位置・向きへ瞬間移動し、パネルを閉じる。建物の隙間にはまったときなどの救済用。残り時間はそのまま。カメラが村の上空を横切らないよう、Cinemachineに瞬間移動を伝えている（`OnTargetObjectWarped`）
 * **閉じる**：`Q`と同じく設定パネルを閉じてゲームに戻る。ボタンの中に`[Q]`を書き、キーでも閉じられることを示す
 
-**タイトルへ戻る**：押すと、ボタンの並びの所が次の確認に切り替わる（別の窓は出さない）。
+* 「タイトルへ戻る」ボタンは置かない。参加者が押すと実験をやり直すことになるため。実験者は開発者用コマンド（`Ctrl+Shift+T`。2.5）で戻す
 
-```text
- │ タイトルへ戻ると、ここまでの進み具合は消えます。 │  ← 漆喰色
- │                 [ キャンセル ] [ タイトルへ戻る ] │  ← キャンセル＝枠線、戻る＝真鍮の地
-```
+**ログ**：「閉じる」ボタンで閉じても`settings_close`は`Q`のときと同じに書く。
 
-* **タイトルへ戻る**（確認側）：`back_to_title`でログを閉じてTitleSceneへ戻る（残り時間も含めて最初から。参加者ID・回は残るので、「はじめる」でその回のチュートリアルからやり直せる（2.5））
-* **キャンセル**：確認を消して元のボタンの並びに戻る
-* 確認中は「閉じる」ボタンを隠す（真鍮の地のボタンが2つ並ぶと、どちらが決定か分かりにくいため）
-* パネルを開き直したときは、確認は出ていない状態から始める。確認中に`Q`を押したら、確認を取り消してパネルを閉じる
-
-**ログ**：「閉じる」ボタンで閉じても`settings_close`は`Q`のときと同じに書く。確認でキャンセルしたことは記録しない。
-
-**実装**：`SettingsPanelUI`のInspectorの「確認・閉じる」に`actionGroup`・`confirmGroup`・`confirmTitleButton`・`cancelTitleButton`・`closeButton`。`ShowTitleConfirm()`でふだんの並びと確認を切り替える（`Open`・`Close`のたびに確認を消す）。確認用の参照が未設定なら、1回押すだけでタイトルへ戻る。「閉じる」ボタンは`DialogueManager.CloseSettingsFromButton()`（`InSettings`のときだけ`CloseSettings()`）。MainSceneでは`SettingsPanel`の下に`Backdrop`・`Bg`・`ActionGroup`（`RespawnButton`・`TitleButton`・`CaptionText`）・`ConfirmGroup`（`MessageText`・`CancelTitleButton`・`ConfirmTitleButton`）・`CloseButton`。以前の「Q：閉じる」（`HintText`）は非表示
+**実装**：「閉じる」ボタンは`SettingsPanelUI.closeButton`→`DialogueManager.CloseSettingsFromButton()`（`InSettings`のときだけ`CloseSettings()`）。MainSceneでは`SettingsPanel`の下に`Backdrop`・`Bg`・`ActionGroup`（`RespawnButton`・`CaptionText`）・`CloseButton`。以前の「Q：閉じる」（`HintText`）は非表示。以前あった`TitleButton`・`ConfirmGroup`と、`SettingsPanelUI`の`titleButton`・`actionGroup`・`confirmGroup`・`confirmTitleButton`・`cancelTitleButton`・`ShowTitleConfirm()`・`OnClickTitle()`は消す（TutorialSceneはMainSceneから作り直す。2.4）
 
 ---
 
@@ -945,7 +943,7 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 |---|---|---|
 | `DialogueManager` | `StartNode`／`ShowNode`／`ExecuteNodeAction`／選択肢の決定／`SubmitTypedText`／`ShowAIResponse`／`CloseDialogue`／`HandleTimeUp`／`OpenSettings`／`CloseSettings`／`RespawnPlayer` | dialogue_start／npc_line／topic_heard／choice_select／free_input_submit／ai_response／dialogue_end／time_up／settings_open／settings_close／respawn |
 | `ExplorationTimer` | `Begin` | explore_start |
-| `SettingsPanelUI` | 「タイトルへ戻る」 | session_end（back_to_title） |
+| `DialogueManager` | 開発者用コマンド`Ctrl+Shift+T`（2.5） | session_end（back_to_title） |
 | `DialogueManager` | `EndGame`（アンケート画面） | session_end（time_up） |
 | `ExperimentLogger` | 開始時／アプリ終了時（エディタのPlay停止も含む） | session_start／session_end（app_quit） |
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
 using TMPro;
 using StarterAssets;
 using Unity.Cinemachine;
@@ -211,6 +212,12 @@ public class DialogueManager : MonoBehaviour
 
     private void Update()
     {
+        if (DeveloperBackToTitlePressed())
+        {
+            BackToTitle();
+            return;
+        }
+
         switch (currentState)
         {
             case GameState.FreeMove:
@@ -237,6 +244,32 @@ public class DialogueManager : MonoBehaviour
                 HandleIntroInput();
                 break;
         }
+    }
+
+    // =========================
+    // 開発者用コマンド（README 2.5）
+    // =========================
+
+    private const string TitleSceneName = "TitleScene";
+
+    // Ctrl+Shift+T。どの状態でも効く。画面には出さない（参加者に見せないため）
+    private static bool DeveloperBackToTitlePressed()
+    {
+        var keyboard = Keyboard.current;
+        return keyboard != null &&
+               keyboard.ctrlKey.isPressed &&
+               keyboard.shiftKey.isPressed &&
+               keyboard.tKey.wasPressedThisFrame;
+    }
+
+    // タイトルへ戻る。進み具合はリセットされる（シーンを読み直すため）。参加者ID・回は残る
+    private void BackToTitle()
+    {
+        Debug.Log("[Developer] Back to title");
+        ExperimentLogger.EndSessionNow("back_to_title");
+
+        Time.timeScale = 1f; // 設定パネル表示中は止めているので戻してから移る
+        SceneManager.LoadScene(TitleSceneName);
     }
 
     // =========================

@@ -1,14 +1,11 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using UnityEngine.SceneManagement;
 
 // 設定パネルの表示とスライダー・ボタンの処理（README 3.8）
 // 開閉のタイミング（Qキー・状態遷移）はDialogueManagerが管理する
 public class SettingsPanelUI : MonoBehaviour
 {
-    public const string TitleSceneName = "TitleScene";
-
     [SerializeField] private GameObject settingsPanel;
     [SerializeField] private Slider bgmSlider;
     [SerializeField] private Slider seSlider;
@@ -16,15 +13,7 @@ public class SettingsPanelUI : MonoBehaviour
     [SerializeField] private TMP_Text bgmValueText;
     [SerializeField] private TMP_Text seValueText;
     [SerializeField] private TMP_Text sensitivityValueText;
-    [SerializeField] private Button titleButton;
     [SerializeField] private Button respawnButton;
-
-    // 「タイトルへ戻る」の確認と「閉じる」ボタン（README 3.8）。未設定なら確認なしですぐ戻る
-    [Header("確認・閉じる")]
-    [SerializeField] private GameObject actionGroup;
-    [SerializeField] private GameObject confirmGroup;
-    [SerializeField] private Button confirmTitleButton;
-    [SerializeField] private Button cancelTitleButton;
     [SerializeField] private Button closeButton;
 
     public bool IsOpen => settingsPanel.activeSelf;
@@ -40,33 +29,10 @@ public class SettingsPanelUI : MonoBehaviour
 
         respawnButton.onClick.AddListener(OnClickRespawn);
 
-        if (confirmGroup != null && confirmTitleButton != null)
-        {
-            titleButton.onClick.AddListener(() => ShowTitleConfirm(true));
-            confirmTitleButton.onClick.AddListener(OnClickTitle);
-            if (cancelTitleButton != null)
-                cancelTitleButton.onClick.AddListener(() => ShowTitleConfirm(false));
-        }
-        else
-        {
-            titleButton.onClick.AddListener(OnClickTitle);
-        }
-
         if (closeButton != null)
             closeButton.onClick.AddListener(OnClickClose);
 
         settingsPanel.SetActive(false);
-    }
-
-    // ふだんのボタンの並びと確認を切り替える。確認中は「閉じる」を隠し、決定のボタンを1つにする（Qでは閉じられる）
-    private void ShowTitleConfirm(bool show)
-    {
-        if (confirmGroup != null)
-            confirmGroup.SetActive(show);
-        if (actionGroup != null)
-            actionGroup.SetActive(!show);
-        if (closeButton != null)
-            closeButton.gameObject.SetActive(!show);
     }
 
     private void OnClickClose()
@@ -89,14 +55,11 @@ public class SettingsPanelUI : MonoBehaviour
             sensitivitySlider.SetValueWithoutNotify(LookSensitivitySettings.Instance.Sensitivity);
 
         UpdateValueTexts();
-        ShowTitleConfirm(false);
         settingsPanel.SetActive(true);
     }
 
-    // 確認中に閉じたら確認は取り消す（次に開いたときはふだんの並びから）
     public void Close()
     {
-        ShowTitleConfirm(false);
         settingsPanel.SetActive(false);
     }
 
@@ -121,16 +84,6 @@ public class SettingsPanelUI : MonoBehaviour
         bgmValueText.text = Mathf.RoundToInt(bgmSlider.value * 100) + "%";
         seValueText.text = Mathf.RoundToInt(seSlider.value * 100) + "%";
         sensitivityValueText.text = sensitivitySlider.value.ToString("0.0");
-    }
-
-    // タイトルへ戻る。クエストの進み具合はリセットされる（MainSceneを読み直すため）
-    private void OnClickTitle()
-    {
-        Debug.Log("[Settings] Back to title");
-        ExperimentLogger.EndSessionNow("back_to_title");
-
-        Time.timeScale = 1f; // 設定パネル表示中は止めているので戻してから移る
-        SceneManager.LoadScene(TitleSceneName);
     }
 
     private void OnClickRespawn()
