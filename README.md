@@ -1030,9 +1030,10 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 | BGM | シーンのルートの`BGM`。本番は`Assets/Audio/BGM.wav`（約82秒）、チュートリアルは`Assets/Audio/Tutorial.mp3` | ループ再生・起動時に自動再生・2D。読み込みはStreaming・Vorbis品質70% |
 | SE | `Player/PlayerArmature/Audio/`の`Footstep_Concrete`・`Footstep_Land` | 足音・着地音 |
 | SE | MainSceneの`GameManager`の子`TimeUpSE`。`Assets/Audio/TimeUp.mp3` | 時間切れの音（5.1）。`ExplorationTimer`が時間切れの瞬間に1回鳴らす。ループなし・起動時に再生しない・2D。読み込みはDecompress On Load |
+| SE | 3シーンのルートの`UIClickSound`。`Assets/Audio/Click.mp3` | ボタンのクリック音（7.4.2）。シーンをまたいでも途切れないよう`DontDestroyOnLoad`の`AudioSource`で鳴らす。読み込みはDecompress On Load |
 
 * 初期値はBGM・SEとも80%。保存しない（1.4）
-* 新しい音を足すときは、その`AudioSource`に`VolumeChannel`を付ける
+* 新しい音を足すときは、その`AudioSource`に`VolumeChannel`を付ける（クリック音だけは例外。7.4.2）
 
 ### 7.4.1 SEごとの標準音量（`SEVolumeTable`）
 
@@ -1053,6 +1054,22 @@ SEごとの音量の差（足音が大きすぎる、時間切れの音が小さ
 * BGMは対象外（BGMは1曲ずつなので、今まで通り`AudioSource`のVolumeで調整する）
 * Playモード中に表の値を変えると、すぐに鳴っている音に反映される（聞きながら調整できる）。ScriptableObjectなので、Playモード中に変えた値もそのまま残る
 * 新しいSEを足すときは、`VolumeChannel`を付けたうえで、この表に1行足す
+
+### 7.4.2 ボタンのクリック音
+
+マウスで押せる`Button`を押すと、`Assets/Audio/Click.mp3`（約1秒）が鳴る。3シーン共通。
+
+* **鳴らす対象**：シーンのルートに置いた`UIClickSound`が、起動時にシーン内の`Button`（非表示のものも含む）を集めて、`onClick`に「クリック音を鳴らす」を足す。ボタンを1つずつ設定しなくてよい。実行中にボタンを生成する所は無いので、これで全部に付く
+  * タイトル画面：「はじめる」「開発者設定」、開発者設定の「決定」「キャンセル」「もう一度」
+  * 設定パネル：「初期位置に戻る」「閉じる」
+  * 会話UI：「送信」（条件B）・「会話をやめる」
+  * アンケート画面：「回答する」「完了」、確認の「はい」「いいえ」
+  * `interactable = false`のボタン（入力が空の「送信」、準備中の「はじめる」など）は押せないので鳴らない
+* **鳴らさないもの**：キーボードの操作（Enterでセリフを送る・選択肢を決める、`Q`で設定を開く、など）とスライダー
+* **シーンをまたいでも途切れない**：`UIClickSound`は最初に鳴らすときに`DontDestroyOnLoad`の`AudioSource`（`UIClickSoundSource`、2D）を1つ作り、それで`PlayOneShot`する（3シーンで共有）
+* **音量**：ほかのSEと同じく「**標準音量（`SEVolumeTable`）× 効果音の設定音量**」。`VolumeChannel`はシーンごとの`AudioVolumeSettings`に結び付くので使わず、鳴らす瞬間に`AudioVolumeSettings.Instance`から同じ計算で求める
+  * TitleSceneにも`AudioVolumeSettings`を置いている（同じ`SEVolumeTable.asset`。設定パネルが無いのでSEは初期値の80%のまま）
+  * `SEVolumeTable`の`Click.mp3`の標準音量は1.0
 
 ## 7.5 空とライティング
 
@@ -1106,6 +1123,7 @@ SEごとの音量の差（足音が大きすぎる、時間切れの音が小さ
 | `MinimapUI` | ミニマップ |
 | `SettingsPanelUI` | 設定パネルのスライダー・ボタン |
 | `AudioVolumeSettings`／`VolumeChannel`／`SEVolumeTable` | BGM・SE音量、SEごとの標準音量（7.4.1） |
+| `UIClickSound` | ボタンのクリック音（7.4.2） |
 | `LookSensitivitySettings` | 視点感度 |
 | `ExperimentLogger` | 実験ログ（6章） |
 | `GameState`（enum） | 4.1 |
