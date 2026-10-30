@@ -229,8 +229,9 @@ public class TutorialGuide : MonoBehaviour
                 return Key("Q") + " で設定を開けます。音の大きさを変えたり、\n動けなくなったときに「初期位置に戻る」を押したりできます。\n開いて閉じてみましょう";
             default:
                 // 時間は本番の制限時間から作る（README 2.4・5.1）
-                return "本番では右上に残り時間が出て、" + ExplorationTimer.FormatDuration(ExplorationTimer.DurationSeconds) + "たつと自動で終わります。\n残り"
-                    + ExplorationTimer.FormatDuration(ExplorationTimer.WarningSeconds) + "になると、残り時間の色が変わります。\n準備ができたら " + Key("Enter");
+                var time = ExplorationSettings.Current;
+                return "本番では右上に残り時間が出て、" + ExplorationSettings.FormatDuration(time.durationSeconds) + "たつと自動で終わります。\n残り"
+                    + ExplorationSettings.FormatDuration(time.warningSeconds) + "になると、残り時間の色が変わります。\n準備ができたら " + Key("Enter");
         }
     }
 

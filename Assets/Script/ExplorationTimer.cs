@@ -8,9 +8,9 @@ public class ExplorationTimer : MonoBehaviour
 {
     public static ExplorationTimer Instance;
 
-    // 制限時間と残り時間の合図（秒）。TutorialSceneの札も読むので、Inspectorではなくここで決める（README 5.1）
-    public const float DurationSeconds = 180f;
-    public const float WarningSeconds = 60f;
+    // 制限時間と残り時間の合図（秒）は、TutorialSceneの札も読むので設定ファイルで決める（README 5.1）
+    private static float DurationSeconds => ExplorationSettings.Current.durationSeconds;
+    private static float WarningSeconds => ExplorationSettings.Current.warningSeconds;
 
     [Header("残り時間の表示（未設定でも動く）")]
     [SerializeField] private GameObject timerPanel;
@@ -101,17 +101,6 @@ public class ExplorationTimer : MonoBehaviour
 
         shownSeconds = remaining;
         timerText.text = "残り " + (remaining / 60) + ":" + (remaining % 60).ToString("00");
-    }
-
-    // 秒数を札の文にする（300→「5分」、270→「4分30秒」、30→「30秒」。README 2.4）
-    public static string FormatDuration(float seconds)
-    {
-        int total = Mathf.RoundToInt(seconds);
-        int minutes = total / 60;
-        int rest = total % 60;
-        if (minutes == 0)
-            return rest + "秒";
-        return rest == 0 ? minutes + "分" : minutes + "分" + rest + "秒";
     }
 
     // 残りWarningSeconds以下で色を変え、その瞬間から窓を1回だけ大きくして戻す。ログには書かない

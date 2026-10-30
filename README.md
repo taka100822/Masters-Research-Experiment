@@ -196,7 +196,7 @@ MainScene：説明画面（3.7）→ Enter → 本番3分
 | 5 | `[Q] で設定を開けます。音の大きさを変えたり、↵動けなくなったときに「初期位置に戻る」を押したりできます。↵開いて閉じてみましょう` | 設定パネルを開いて閉じた |
 | 6 | `本番では右上に残り時間が出て、3分たつと自動で終わります。↵残り1分になると、残り時間の色が変わります。↵準備ができたら [Enter]` | Enter → MainSceneへ |
 
-* 6の「5分」「1分」は、本番の制限時間・残り時間の合図（5.1の`ExplorationTimer.DurationSeconds`・`WarningSeconds`）から作る（`ExplorationTimer.FormatDuration`。60秒で割り切れれば`3分`、割り切れなければ`4分30秒`）。制限時間を変えても札の文を直さなくてよい
+* 6の「3分」「1分」は、本番の制限時間・残り時間の合図（5.1の`ExplorationSettings`の`durationSeconds`・`warningSeconds`）から作る（`ExplorationSettings.FormatDuration`。60秒で割り切れれば`3分`、割り切れなければ`4分30秒`）。制限時間を変えても札の文を直さなくてよい
 
 * 札は残り時間の窓と同じ見た目（樫色＋真鍮の縁）で、幅720、画面上端から16px。文字20px・中央揃え。会話中・設定パネル表示中も出たまま（設定パネルの暗幕の下になる）
 * **改行**：札の文は文の切れ目で手で改行してある（1行は全角30字まで。札の幅672px・20pxで約33字入る）。そのうえで3.4と同じ処理（`JapaneseLineBreaker.Format`）で文節の途中では折り返さないようにする
@@ -794,12 +794,14 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 ## 5.1 制限時間
 
 * **3分（180秒）**（2026-10-30に5分から短くした。[`docs/history.md`](docs/history.md#2026-10-30-制限時間を3分にする)）。説明画面を閉じたときから数え始める（`ExplorationTimer`）
-* **制限時間・残り時間の合図の秒数はコードの定数で決める**（`ExplorationTimer.DurationSeconds`（180）・`WarningSeconds`（60））。Inspectorでは変えられない。TutorialSceneには`ExplorationTimer`が無いので、チュートリアルの札（2.4の6）もこの定数を読めるようにするため。変えるときはこの2つを直せば、残り時間の表示・時間切れ・ログの`duration=`・チュートリアルの札がそろって変わる（説明画面の「3分間」はシーンに書いた文なので別に直す。3.7）
+* **制限時間・残り時間の合図の秒数は設定ファイルで決める**：`ExplorationSettings`（ScriptableObject）を`Assets/Resources/ExplorationSettings.asset`に1つだけ作り、Inspectorで`durationSeconds`（180）・`warningSeconds`（60）を変える。TutorialSceneには`ExplorationTimer`が無いので、シーンではなく両シーンから読めるファイルに置く（`Resources.Load`。`ExplorationSettings.Current`）。ファイルが無いときは180・60で動く
+  * 変えるときはこのファイルだけ直せば、残り時間の表示・時間切れ・ログの`duration=`・チュートリアルの札（2.4の6）がそろって変わる（説明画面の「3分間」はシーンに書いた文なので別に直す。3.7）
+  * 秒数を札の文にするのは`ExplorationSettings.FormatDuration`
 * 数えるのは`play_time`（6.4）と同じゲーム内の時間。**設定パネルを開いている間だけ止まる**（`Time.timeScale = 0`）。会話中・自由入力中・AIの返答待ちの間も進む
 * **残り時間の表示**：ミニマップの下に、同じ窓の見た目で`残り 2:32`と出す（`TimerPanel`、3.7）。両条件で同じ
 * **残り1分の合図**：残りが60秒以下になったら、`TimerText`の色を漆喰色から真鍮色（`#E0B354`）に変え、その瞬間に1回だけ窓を少し大きくして戻す（1.0→1.15→1.0倍、0.6秒。窓の右上を中心に大きくなる）。音は鳴らさない（時間切れの音（7.4）と区別するため）。設定パネル中は時間が止まっているので、窓の動きも止まる
   * ログには書かない（`explore_start`から120秒後と決まっているので、後から分かる）
-  * **実装**：`ExplorationTimer`の`WarningSeconds`（60。定数）・`warningColor`・`pulseScale`（1.15）・`pulseDuration`（0.6）。`UpdateWarning`で切り替える
+  * **実装**：`ExplorationSettings`の`warningSeconds`（60）、`ExplorationTimer`の`warningColor`・`pulseScale`（1.15）・`pulseDuration`（0.6）。`UpdateWarning`で切り替える
 
 **時間切れのSE**：残り時間が0になった瞬間に1回だけ`TimeUp`のSEを鳴らす（7.4）。会話中でアンケート画面がまだ出ないときも、この時点で鳴らす（時間切れを知らせるため）。BGMはアンケート画面が出るまで鳴り続ける（3.7）
 
