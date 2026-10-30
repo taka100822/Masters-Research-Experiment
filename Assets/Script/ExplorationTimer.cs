@@ -9,7 +9,7 @@ public class ExplorationTimer : MonoBehaviour
     public static ExplorationTimer Instance;
 
     // 制限時間と残り時間の合図（秒）。TutorialSceneの札も読むので、Inspectorではなくここで決める（README 5.1）
-    public const float DurationSeconds = 300f;
+    public const float DurationSeconds = 180f;
     public const float WarningSeconds = 60f;
 
     [Header("残り時間の表示（未設定でも動く）")]
