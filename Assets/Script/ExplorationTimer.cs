@@ -18,6 +18,13 @@ public class ExplorationTimer : MonoBehaviour
     [Header("時間切れのSE（未設定でも動く。README 5.1）")]
     [SerializeField] private AudioSource timeUpSound;
 
+    [Header("残り時間が少なくなった合図（README 5.1）")]
+    [Tooltip("残りがこの秒数以下になったら、文字の色を変えて窓を1回揺らす")]
+    [SerializeField] private float warningSeconds = 60f;
+    [SerializeField] private Color warningColor = new Color32(0xE0, 0xB3, 0x54, 0xFF); // 真鍮（README 3.2）
+    [SerializeField] private float pulseScale = 1.15f;
+    [SerializeField] private float pulseDuration = 0.6f;
+
     public bool IsRunning { get; private set; }
     public bool IsTimeUp { get; private set; }
 
@@ -26,6 +33,8 @@ public class ExplorationTimer : MonoBehaviour
 
     private float elapsed;
     private int shownSeconds = -1;
+    private bool warned;
+    private float warnedAt;
 
     private void Awake()
     {
@@ -69,6 +78,7 @@ public class ExplorationTimer : MonoBehaviour
 
         elapsed += Time.deltaTime;
         UpdateText();
+        UpdateWarning();
 
         if (elapsed >= durationSeconds)
         {
@@ -92,5 +102,28 @@ public class ExplorationTimer : MonoBehaviour
 
         shownSeconds = remaining;
         timerText.text = "残り " + (remaining / 60) + ":" + (remaining % 60).ToString("00");
+    }
+
+    // 残りwarningSeconds以下で色を変え、その瞬間から窓を1回だけ大きくして戻す。ログには書かない
+    // （explore_startからの時間で決まるので後から分かる）
+    private void UpdateWarning()
+    {
+        if (!warned)
+        {
+            if (durationSeconds - elapsed > warningSeconds)
+                return;
+
+            warned = true;
+            warnedAt = elapsed;
+            if (timerText != null)
+                timerText.color = warningColor;
+        }
+
+        if (timerPanel == null)
+            return;
+
+        float t = (elapsed - warnedAt) / pulseDuration;
+        float scale = t >= 1f ? 1f : 1f + (pulseScale - 1f) * Mathf.Sin(t * Mathf.PI);
+        timerPanel.transform.localScale = new Vector3(scale, scale, 1f);
     }
 }

@@ -41,6 +41,19 @@ public class DialogueManager : MonoBehaviour
     private static readonly Color ChoiceNormalColor = new Color32(0xB9, 0xA8, 0x8E, 0xFF);     // 煤
     private static readonly Color ChoiceRowSelectedColor = new Color32(0xE0, 0xB3, 0x54, 0x40); // 真鍮25%
     private const string KeyColor = "#E0B354";
+    private static readonly Color KeyGuideHighlightColor = new Color32(0xE0, 0xB3, 0x54, 0xFF); // 真鍮
+    private static readonly Color SendFlashColor = new Color32(0xF6, 0xEE, 0xDC, 0xFF);         // 漆喰
+
+    // 自由入力中にEnterを押したときの合図（README 3.3）
+    private const float SendFlashSeconds = 0.5f;
+    private const float KeyGuideHighlightSeconds = 1f;
+    private Coroutine enterNudge;
+    private Color sendButtonBaseColor;
+    private Color keyGuideBaseColor;
+
+    // IMEの変換中か・最後に変換中の文字が変わったフレーム（変換を確定するEnterを見分ける）
+    private bool imeComposing;
+    private int lastImeCompositionFrame = -10;
 
     [Header("Player")]
     [SerializeField] private ThirdPersonController playerController;
@@ -62,7 +75,10 @@ public class DialogueManager : MonoBehaviour
     private StarterAssetsInputs inputs;
 
     // AIの返答待ち・失敗時に出す文（README 4.6）
-    private const string WaitingText = "……";
+    // 待っている間は「……」から始めて0.4秒ごとに点の数を替える（止まって見えないように。README 4.6）
+    private static readonly string[] WaitingTexts = { "…", "……", "………" };
+    private const float WaitingTextSeconds = 0.4f;
+    private Coroutine waitingAnimation;
     private const string AIErrorText = "（うまく伝わらなかったようだ。もう一度話しかけてみよう）";
 
     // 送れなかった文章。次に「入力する」を選んだとき入力欄に戻す
@@ -98,6 +114,13 @@ public class DialogueManager : MonoBehaviour
         // 空欄（空白だけ）の間は送信できない（README 3.3）
         inputField.onValueChanged.AddListener(_ => UpdateSendButton());
 
+        if (sendButton != null && sendButton.targetGraphic != null)
+            sendButtonBaseColor = sendButton.targetGraphic.color;
+        if (keyGuideText != null)
+            keyGuideBaseColor = keyGuideText.color;
+        if (Keyboard.current != null)
+            Keyboard.current.onIMECompositionChange += OnIMECompositionChange;
+
         if (ExplorationTimer.Instance != null)
             ExplorationTimer.Instance.OnTimeUp += HandleTimeUp;
 
@@ -118,6 +141,14 @@ public class DialogueManager : MonoBehaviour
     {
         if (ExplorationTimer.Instance != null)
             ExplorationTimer.Instance.OnTimeUp -= HandleTimeUp;
+        if (Keyboard.current != null)
+            Keyboard.current.onIMECompositionChange -= OnIMECompositionChange;
+    }
+
+    private void OnIMECompositionChange(UnityEngine.InputSystem.LowLevel.IMECompositionString composition)
+    {
+        imeComposing = !string.IsNullOrEmpty(composition.ToString());
+        lastImeCompositionFrame = Time.frameCount;
     }
 
     // =========================
@@ -527,6 +558,7 @@ public class DialogueManager : MonoBehaviour
         if (currentState != GameState.InTyping)
             return;
 
+        StopEnterNudge();
         inputPanel.SetActive(false);
         inputField.text = "";
         lastFailedInput = null;
@@ -534,13 +566,73 @@ public class DialogueManager : MonoBehaviour
         CloseDialogue("end=quit_button");
     }
 
+    // Enterでは送信しない（IMEの変換中のEnterで誤送信しないため。README 4.1）。
+    // 代わりに入力欄を選び直し、文字があれば「送信」を目立たせる（README 3.3）
     private void HandleTypingInput()
     {
-        // Enterでは送信しない（IMETROUBLE回避）
+        if (!Keyboard.current.enterKey.wasPressedThisFrame)
+            return;
+
+        // 変換を確定するEnterは無視する（このフレームか1つ前に変換中の文字があった）
+        if (imeComposing || Time.frameCount - lastImeCompositionFrame <= 1)
+            return;
+
+        StopEnterNudge();
+        enterNudge = StartCoroutine(EnterNudge());
+    }
+
+    private System.Collections.IEnumerator EnterNudge()
+    {
+        bool highlight = !string.IsNullOrWhiteSpace(inputField.text);
+        if (highlight && keyGuideText != null)
+            keyGuideText.color = KeyGuideHighlightColor;
+
+        // 1行の入力欄はEnterで選択が外れるので、次のフレームで選び直して文の最後にカーソルを置く
+        yield return null;
+        inputField.ActivateInputField();
+        float start = Time.unscaledTime;
+        yield return null;
+        inputField.MoveTextEnd(false);
+
+        if (highlight)
+        {
+            float t;
+            while ((t = Time.unscaledTime - start) < KeyGuideHighlightSeconds)
+            {
+                if (sendButton != null && sendButton.targetGraphic != null)
+                {
+                    float k = t < SendFlashSeconds ? Mathf.Sin(t / SendFlashSeconds * Mathf.PI) : 0f;
+                    sendButton.targetGraphic.color = Color.Lerp(sendButtonBaseColor, SendFlashColor, k);
+                }
+                yield return null;
+            }
+        }
+
+        enterNudge = null;
+        RestoreEnterNudgeColors();
+    }
+
+    private void StopEnterNudge()
+    {
+        if (enterNudge != null)
+        {
+            StopCoroutine(enterNudge);
+            enterNudge = null;
+        }
+        RestoreEnterNudgeColors();
+    }
+
+    private void RestoreEnterNudgeColors()
+    {
+        if (sendButton != null && sendButton.targetGraphic != null)
+            sendButton.targetGraphic.color = sendButtonBaseColor;
+        if (keyGuideText != null)
+            keyGuideText.color = keyGuideBaseColor;
     }
 
     public void OnClickSend()
     {
+        StopEnterNudge();
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
@@ -570,7 +662,8 @@ public class DialogueManager : MonoBehaviour
         // 返答を待っている間は「……」を出す（止まって見えないように。README 4.6）
         dialoguePanel.SetActive(true);
         nextIndicator.SetActive(false);
-        dialogueText.text = WaitingText;
+        StopWaitingAnimation();
+        waitingAnimation = StartCoroutine(AnimateWaitingText());
         SetKeyGuide("返事を待っています…");
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -607,8 +700,27 @@ public class DialogueManager : MonoBehaviour
         return prompt;
     }
 
+    private System.Collections.IEnumerator AnimateWaitingText()
+    {
+        for (int i = 1; ; i = (i + 1) % WaitingTexts.Length)
+        {
+            dialogueText.text = WaitingTexts[i];
+            yield return new WaitForSecondsRealtime(WaitingTextSeconds);
+        }
+    }
+
+    private void StopWaitingAnimation()
+    {
+        if (waitingAnimation == null)
+            return;
+
+        StopCoroutine(waitingAnimation);
+        waitingAnimation = null;
+    }
+
     private void ShowAIResponse(string reply)
     {
+        StopWaitingAnimation();
         currentState = GameState.InDialogue;
 
         dialoguePanel.SetActive(true);

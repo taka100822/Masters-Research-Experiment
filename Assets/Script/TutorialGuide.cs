@@ -197,7 +197,9 @@ public class TutorialGuide : MonoBehaviour
             case 1:
                 return Key("W") + Key("A") + Key("S") + Key("D") + " で歩いてみましょう。\nマウスで見回せます";
             case 2:
-                return "右上の地図の白い丸が村人です。\n" + first + "に近づいて " + Key("Enter") + " で話しかけましょう";
+                // 2回目の簡易版では、1回目と話し方が変わることを先に知らせる（「条件」とは言わない。README 2.4）
+                return (steps == ShortSteps ? "今回は、村人との話し方が前回と違います。\n" : "右上の地図の白い丸が村人です。\n")
+                    + first + "に近づいて " + Key("Enter") + " で話しかけましょう";
             case 3:
                 return FreeInputOnly
                     ? "話したいことを書いて「送信」を押しましょう。\n返事を読んだら「会話をやめる」で終えます"
@@ -209,7 +211,7 @@ public class TutorialGuide : MonoBehaviour
             case 5:
                 return Key("Q") + " で設定を開けます。音の大きさを変えたり、\n動けなくなったときに「初期位置に戻る」を押したりできます。\n開いて閉じてみましょう";
             default:
-                return "本番では右上に残り時間が出て、5分たつと自動で終わります。\n準備ができたら " + Key("Enter");
+                return "本番では右上に残り時間が出て、5分たつと自動で終わります。\n残り1分になると、残り時間の色が変わります。\n準備ができたら " + Key("Enter");
         }
     }
 
