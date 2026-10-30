@@ -280,10 +280,16 @@ public class DialogueManager : MonoBehaviour
 
         talkHint.SetActive(currentNPC != null);
 
-        if (currentNPC != null && talkHintText != null)
-            talkHintText.text = Key("Enter") + " " + currentNPC.DisplayName + "と話す";
+        // チュートリアルでは、札の順番がまだ来ていない相手とは話せない（README 2.4）
+        bool canTalk = currentNPC != null
+            && (TutorialGuide.Instance == null || TutorialGuide.Instance.CanTalkTo(currentNPC.npcId));
 
-        if (!TalkPressed() || currentNPC == null)
+        if (currentNPC != null && talkHintText != null)
+            talkHintText.text = canTalk
+                ? Key("Enter") + " " + currentNPC.DisplayName + "と話す"
+                : TutorialGuide.Instance.TalkBlockedHint();
+
+        if (!TalkPressed() || !canTalk)
             return;
 
         if (!LoadDialogueCSV(currentNPC.csvFileName))

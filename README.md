@@ -199,7 +199,8 @@ MainScene：説明画面（3.7）→ Enter → 本番5分
 * 札は残り時間の窓と同じ見た目（樫色＋真鍮の縁）で、幅720、画面上端から16px。文字20px・中央揃え。会話中・設定パネル表示中も出たまま（設定パネルの暗幕の下になる）
 * **改行**：札の文は文の切れ目で手で改行してある（1行は全角30字まで。札の幅672px・20pxで約33字入る）。そのうえで3.4と同じ処理（`JapaneseLineBreaker.Format`）で文節の途中では折り返さないようにする
 * 札の高さは文の行数に合わせて伸びる（最小72。`TutorialGuide.minPanelHeight`）。「できました！」の行が増えても窓からはみ出さない
-* 順番どおりにしか進まない（例：1の前にケビンと話しても、2は「話しかけた」にならない。話すこと自体はできる）
+* 順番どおりにしか進まない（例：1の前にケビンと話しても、2は「話しかけた」にならない。ケビンと話すこと自体はできる）
+* **クリスは4の札が出るまで話しかけられない**。4より前にクリスに近づくと、話しかけ案内の札（3.3）は`[Enter] 旅人クリスと話す`の代わりに`先に案内人ケビンと話しましょう`を出し、Enterを押しても会話は始まらない（ケビンの名前は頭上の名前と同じ）。頭上の吹き出し・名前・地図の白い丸はそのまま。4・5の間は普通に話せる。簡易版はクリスの番が来ないので、最後まで話せない。ログには何も書かない。実装は`TutorialGuide.CanTalkTo`・`TalkBlockedHint`（[`docs/history.md`](docs/history.md#2026-10-30-クリスに先に話しかけられないようにする)）
 * 6を出したら、移動・話しかけ・設定パネルを止める（`DialogueManager.LockForTutorialEnd`）。Enterは札が出た次のフレームから受け付ける
 * 音量・視点の速さはシーンごとに初期値に戻るので、チュートリアルで変えても本番には引き継がれない（1.4）
 
@@ -225,7 +226,7 @@ MainScene：説明画面（3.7）→ Enter → 本番5分
 
 **作り方**：シーンは手で作らず、Unityのメニュー **Tools → 研究用 → チュートリアルのシーンを作り直す**（`TutorialSceneBuilder`）で、MainSceneから作る。MainSceneを複製し、村（`Background`・`WaterBlockers`）とNPC003〜006を消し、NPC001・002を案内役に作り替え、草地・壁・札・ミニマップの地図を置いて、ビルド設定（タイトルの次）に足す。**MainSceneのプレイヤー・UI・NPCを変えたら作り直す**（作り直すと`TutorialScene`の手での変更は消える）
 
-**実装**：`TutorialGuide`（`TutorialScene`の`GameManager`に付ける）が進み具合を持つ。`DialogueManager`は会話の開始・選択の決定・AIの返事の表示・会話の終わり・設定パネルの開閉を`TutorialGuide.Instance`に知らせる（MainSceneでは`Instance`が無いので何もしない）
+**実装**：`TutorialGuide`（`TutorialScene`の`GameManager`に付ける）が進み具合を持つ。`DialogueManager`は会話の開始・選択の決定・AIの返事の表示・会話の終わり・設定パネルの開閉を`TutorialGuide.Instance`に知らせる（MainSceneでは`Instance`が無いので何もしない）。話しかけてよい相手かどうかも`HandleFreeMoveInput`が`TutorialGuide.CanTalkTo`に聞く
 
 ## 2.5 1人2回の進め方
 
@@ -440,7 +441,7 @@ Canvas（Screen Space Overlay）
 * **会話をやめる**（`CancelButton`→`DialogueManager.OnClickCancelInput`）：枠線だけ。幅160（送信は120）。書きかけの文章（送れなかった文章の残し（4.6）も）を捨てて**会話を閉じる**。ログは`dialogue_end`（`detail`に`end=quit_button`）
 * プレースホルダーは「聞きたいことを書いてください」
 
-**話しかけ案内**（`TalkHint`）：近くのNPCがいると、画面下中央（下から48px）に樫色の小さな札で`[Enter] 薬師ティムと話す`と出す（近くのNPCの名前を入れる。文字は子の`TalkHintText`）。NPC頭上の吹き出し（3.5）も同時に出る。会話窓が出ている間は出さない。
+**話しかけ案内**（`TalkHint`）：近くのNPCがいると、画面下中央（下から48px）に樫色の小さな札で`[Enter] 薬師ティムと話す`と出す（近くのNPCの名前を入れる。文字は子の`TalkHintText`）。NPC頭上の吹き出し（3.5）も同時に出る。会話窓が出ている間は出さない。チュートリアルで、まだ話しかけられない相手（4の札より前のクリス）のときは`先に案内人ケビンと話しましょう`を出し、Enterで会話を始めない（2.4）。
 
 **実装**：`DialogueManager`のInspectorの「Dialogue UI Style」に`keyGuideText`・`talkHintText`・`inputHeaderText`・`choiceRows`・`sendButton`（未設定でも動く）。操作案内の切り替えは`SetKeyGuide`、選択肢の見た目は`UpdateChoiceUI`、送信ボタンの有効・無効は`UpdateSendButton`。自由入力中のEnterの合図は`HandleTypingInput`→`EnterNudge`（「送信」・「会話をやめる」を押したときは`StopEnterNudge`で色を戻す）。▼の揺れは`UIBob`（`Time.unscaledTime`）。
 

@@ -52,6 +52,9 @@ public class TutorialGuide : MonoBehaviour
     private int dialogueActions;
     private bool settingsOpenedThisStep;
 
+    // 毎フレーム探さないように、最初に作った文を使い回す
+    private string talkBlockedHint;
+
     private DialogueManager dialogueManager;
 
     private static bool FreeInputOnly => ExperimentSettings.Instance != null && ExperimentSettings.Instance.FreeInputOnly;
@@ -119,6 +122,20 @@ public class TutorialGuide : MonoBehaviour
     // =========================
     // DialogueManagerから呼ぶ
     // =========================
+
+    // クリスは4の札が出るまで話しかけられない（README 2.4）
+    public bool CanTalkTo(string npcId)
+    {
+        return npcId != secondNpcId || step >= 4;
+    }
+
+    // 話しかけられない相手に近づいたときの案内の札の文。4より前は、次に話す相手がいつもケビン
+    public string TalkBlockedHint()
+    {
+        if (talkBlockedHint == null)
+            talkBlockedHint = "先に" + NpcName(firstNpcId, "ケビン") + "と話しましょう";
+        return talkBlockedHint;
+    }
 
     public void OnDialogueStarted(string npcId)
     {
