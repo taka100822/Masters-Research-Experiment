@@ -744,6 +744,11 @@ public class DialogueManager : MonoBehaviour
         string detail = "prompt=" + promptPath + ";hash=" + ExperimentLogger.Hash8(prompt.systemPrompt) + ";latency_ms=" + stopwatch.ElapsedMilliseconds;
         if (!result.Success)
             detail += ";error=" + result.Error;
+        // 実際に使われたモデルの版。返事に無い項目は書かない（README 6.3）
+        if (result.Model != null)
+            detail += ";resp_model=" + result.Model;
+        if (result.Fingerprint != null)
+            detail += ";fp=" + result.Fingerprint;
 
         ExperimentLogger.Log("ai_response", npcId: npcId, nodeId: nodeId, text: shown, isError: !result.Success, detail: detail);
 

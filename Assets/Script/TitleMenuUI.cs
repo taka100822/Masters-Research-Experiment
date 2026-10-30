@@ -24,6 +24,8 @@ public class TitleMenuUI : MonoBehaviour
     [SerializeField] private Button cancelButton;   // 「キャンセル」：値を変えずに閉じる（README 3.1）。未設定でも動く
     [SerializeField] private TMP_Text errorText;
     [SerializeField] private TMP_Text logPathText;   // ログの保存先（README 6.2）
+    [SerializeField] private TMP_Text backupPathText;   // ログの控えの場所（README 6.2）。未設定でも動く
+    [SerializeField] private TMP_Text nextIdText;   // 次のIDとグループごとの完了人数（README 3.1）。未設定でも動く
 
     [Tooltip("モーダル表示中に隠すもの（タイトル文字・はじめるボタンが窓の後ろからはみ出して見えないように）")]
     [SerializeField] private GameObject[] hideWhileModalOpen;
@@ -90,10 +92,13 @@ public class TitleMenuUI : MonoBehaviour
     {
         participantIdInput.text = ExperimentConfig.ParticipantId;
         roundDropdown.SetValueWithoutNotify(ExperimentConfig.Round - 1);
+        ShowNextId();
         UpdateGroupInfo();
         UpdateExistingLogWarning();
         if (logPathText != null)
             logPathText.text = "ログ保存先：" + ExperimentLogger.LogDirectory;
+        if (backupPathText != null)
+            backupPathText.text = "控え：" + ExperimentLogger.BackupDirectory;
 
         developerModal.SetActive(true);
         SetTitleContentVisible(false);
@@ -101,6 +106,22 @@ public class TitleMenuUI : MonoBehaviour
         // 開くたびに自動で1回確かめる（確かめ忘れないように）
         CheckAIConnection();
         CheckLogWrite();
+    }
+
+    // 番号を飛ばす・重ねるとグループの人数が偏るので、次のIDと完了人数を出す（README 3.1）
+    // IDの欄が空なら次のIDを入れておく。前の人のやり直しなら実験者が直す
+    private void ShowNextId()
+    {
+        var scan = ExperimentLogger.ScanParticipants();
+        if (string.IsNullOrEmpty(participantIdInput.text))
+            participantIdInput.text = scan.NextId;
+
+        if (nextIdText != null)
+        {
+            var c = scan.CompletedByGroup;
+            nextIdText.text = "次のID " + scan.NextId +
+                "    完了 G1:" + c[1] + "人 G2:" + c[2] + "人 G3:" + c[3] + "人 G4:" + c[4] + "人";
+        }
     }
 
     // 書き込めなければ、ビルドを書き込める場所へ移す（README 3.1）
@@ -123,6 +144,15 @@ public class TitleMenuUI : MonoBehaviour
             logCheckText.color = errorText.color;
             logCheckText.text = "失敗：summary.csvが開かれています（Excelなどを閉じてください）";
             Debug.LogWarning("[Log Check] summary.csv locked: " + error);
+            return;
+        }
+
+        // 控えに書けなくてもログは残るので、失敗ではなく注意として出す（README 6.2）
+        if (!ExperimentLogger.CanWriteBackup(out error))
+        {
+            logCheckText.color = LogCheckPendingColor;
+            logCheckText.text = "OK（控えのフォルダに書けません）";
+            Debug.LogWarning("[Log Check] backup failed: " + error);
             return;
         }
 
@@ -163,8 +193,10 @@ public class TitleMenuUI : MonoBehaviour
         if (result.Success)
         {
             aiCheckText.color = AICheckOkColor;
-            aiCheckText.text = "OK（" + seconds + "秒）";
-            Debug.Log("[AI Check] ok " + seconds + "s");
+            // 実際に使われたモデルの版も出し、実験期間中に変わったらその場で気づけるようにする（README 6.3）
+            string version = result.Model != null ? "・" + result.Model : "";
+            aiCheckText.text = "OK（" + seconds + "秒" + version + "）";
+            Debug.Log("[AI Check] ok " + seconds + "s model=" + (result.Model ?? "-") + " fp=" + (result.Fingerprint ?? "-"));
         }
         else
         {

@@ -24,13 +24,25 @@ public class ExperimentLogger : MonoBehaviour
             ? Path.Combine(Application.dataPath, "ExperimentLogs")
             : Path.Combine(Directory.GetParent(Application.dataPath).FullName, "ExperimentLogs");
 
+    // ログの控え。ビルドのフォルダの外（ドキュメント）に置き、ビルドを消しても残るようにする（README 6.2）
+    // エディタの控えは本番の控えと混ざらないよう別のフォルダにする
+    public static string BackupDirectory =>
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            Application.isEditor ? "ExperimentLogsBackup_Editor" : "ExperimentLogsBackup");
+
     // 保存先に書き込めるか。短いファイルを書いてすぐ消す（開発者用モーダルの確認。README 3.1）
-    public static bool CanWrite(out string error)
+    public static bool CanWrite(out string error) => CanWriteTo(LogDirectory, out error);
+
+    // 控えのフォルダに書き込めるか（README 6.2）
+    public static bool CanWriteBackup(out string error) => CanWriteTo(BackupDirectory, out error);
+
+    private static bool CanWriteTo(string directory, out string error)
     {
         try
         {
-            Directory.CreateDirectory(LogDirectory);
-            string path = Path.Combine(LogDirectory, ".write_check_" + Guid.NewGuid().ToString("N") + ".tmp");
+            Directory.CreateDirectory(directory);
+            string path = Path.Combine(directory, ".write_check_" + Guid.NewGuid().ToString("N") + ".tmp");
             File.WriteAllText(path, "check");
             File.Delete(path);
             error = null;
@@ -90,6 +102,99 @@ public class ExperimentLogger : MonoBehaviour
                 count++;
         }
         return count;
+    }
+
+    // 保存先の本番のログから出す、次の参加者IDとグループごとの完了人数（README 3.1）
+    public struct ParticipantScan
+    {
+        public string NextId;
+        public int[] CompletedByGroup;   // [1]〜[4]。2回ともtime_upで終わった人の数
+    }
+
+    // ファイル名（{ID}_{条件}_S{番号}_{日付}_{時刻}.csv）からIDを、最後のsession_endから終わり方を読む
+    // 番号が0のID（P000など、動作確認用）は数えない
+    public static ParticipantScan ScanParticipants()
+    {
+        var timeUps = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        if (Directory.Exists(LogDirectory))
+        {
+            foreach (string path in Directory.GetFiles(LogDirectory, "*.csv"))
+            {
+                string name = Path.GetFileNameWithoutExtension(path);
+                if (name.EndsWith("_tutorial", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string[] parts = name.Split('_');
+                if (parts.Length < 5 || !parts[parts.Length - 3].StartsWith("S"))
+                    continue;   // summary.csvなど
+                string id = string.Join("_", parts, 0, parts.Length - 4);
+                if (ExperimentConfig.GroupOf(id) == 0)
+                    continue;
+
+                bool timeUp = EndedByTimeUp(path);
+                timeUps[id] = (timeUps.TryGetValue(id, out int n) ? n : 0) + (timeUp ? 1 : 0);
+            }
+        }
+
+        var scan = new ParticipantScan { CompletedByGroup = new int[5] };
+        string maxId = null;
+        int maxNumber = 0;
+        foreach (var pair in timeUps)
+        {
+            if (pair.Value >= 2)
+                scan.CompletedByGroup[ExperimentConfig.GroupOf(pair.Key)]++;
+
+            int number = TrailingNumber(pair.Key, out _);
+            if (number > maxNumber)
+            {
+                maxNumber = number;
+                maxId = pair.Key;
+            }
+        }
+
+        // 頭の文字と桁数はいちばん大きい番号のIDに合わせる（P012→P013）
+        if (maxId == null)
+        {
+            scan.NextId = "P001";
+        }
+        else
+        {
+            TrailingNumber(maxId, out int digits);
+            scan.NextId = maxId.Substring(0, maxId.Length - digits) +
+                (maxNumber + 1).ToString(new string('0', digits), CultureInfo.InvariantCulture);
+        }
+        return scan;
+    }
+
+    private static bool EndedByTimeUp(string path)
+    {
+        try
+        {
+            string last = null;
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var sr = new StreamReader(fs, Encoding.UTF8))
+            {
+                string line;
+                while ((line = sr.ReadLine()) != null)
+                    if (line.Contains(",session_end,"))
+                        last = line;
+            }
+            return last != null && last.Contains("reason=time_up");
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("[Log] Could not read " + Path.GetFileName(path) + ": " + e.Message);
+            return false;
+        }
+    }
+
+    private static int TrailingNumber(string id, out int digits)
+    {
+        int start = id.Length;
+        while (start > 0 && char.IsDigit(id[start - 1]))
+            start--;
+        digits = id.Length - start;
+        return digits > 0 && int.TryParse(id.Substring(start), out int n) ? n : 0;
     }
 
     private StreamWriter writer;
@@ -264,6 +369,37 @@ public class ExperimentLogger : MonoBehaviour
         sessionEnded = true;
 
         AppendSummary(reason);
+        BackupLogs();
+    }
+
+    // 保存先のCSV（このセッションのログ・summary.csv・summary_pending_…）を控えのフォルダへ写す（README 6.2）
+    // 控えに無いもの・控えより新しいものを全部写すので、途中で落ちたセッションのログも次の終わりに追いつく
+    // 写せなくてもゲームは止めない。元のログは残っている
+    private static void BackupLogs()
+    {
+        try
+        {
+            Directory.CreateDirectory(BackupDirectory);
+            foreach (string source in Directory.GetFiles(LogDirectory, "*.csv"))
+            {
+                string dest = Path.Combine(BackupDirectory, Path.GetFileName(source));
+                if (File.Exists(dest) && File.GetLastWriteTimeUtc(dest) >= File.GetLastWriteTimeUtc(source))
+                    continue;
+
+                try
+                {
+                    File.Copy(source, dest, true);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning("[Log] backup failed: " + Path.GetFileName(source) + " (" + e.Message + ")");
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("[Log] backup failed: " + e.Message);
+        }
     }
 
     // =========================

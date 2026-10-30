@@ -26,7 +26,12 @@ public class ChatGPTClient : MonoBehaviour
         public string Text;
         public string Error;
 
-        public static ChatResult Ok(string text) => new ChatResult { Success = true, Text = text };
+        // 返事に入っていた、実際に使われたモデルの版とサーバー側の構成の識別子（README 6.3）。無ければnull
+        public string Model;
+        public string Fingerprint;
+
+        public static ChatResult Ok(string text, string model, string fingerprint) =>
+            new ChatResult { Success = true, Text = text, Model = model, Fingerprint = fingerprint };
         public static ChatResult Fail(string error) => new ChatResult { Success = false, Error = error };
     }
 
@@ -47,6 +52,8 @@ public class ChatGPTClient : MonoBehaviour
     [System.Serializable]
     public class ChatResponse
     {
+        public string model;
+        public string system_fingerprint;
         public Choice[] choices;
 
         [System.Serializable]
@@ -182,7 +189,10 @@ public class ChatGPTClient : MonoBehaviour
                 return ChatResult.Fail("parse");
             }
 
-            return ChatResult.Ok(response.choices[0].message.content);
+            return ChatResult.Ok(
+                response.choices[0].message.content,
+                string.IsNullOrEmpty(response.model) ? null : response.model,
+                string.IsNullOrEmpty(response.system_fingerprint) ? null : response.system_fingerprint);
         }
         catch (System.Exception e)
         {
