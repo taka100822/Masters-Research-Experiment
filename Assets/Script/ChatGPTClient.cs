@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -88,14 +89,23 @@ public class ChatGPTClient : MonoBehaviour
         apiKey = keyFile.text.Trim();
     }
 
-    public async Task<ChatResult> SendChatMessage(
+    public Task<ChatResult> SendChatMessage(
         string userText,
         string systemPrompt)
+    {
+        return SendChatMessage(userText, systemPrompt, null);
+    }
+
+    // historyはこの会話のそれまでのやり取り（assistant／userの順。README 4.3）。nullなら履歴なし
+    public async Task<ChatResult> SendChatMessage(
+        string userText,
+        string systemPrompt,
+        IReadOnlyList<ChatRequest.Message> history)
     {
         if (string.IsNullOrEmpty(apiKey))
             return ChatResult.Fail("no_key");
 
-        string json = BuildRequest(userText, systemPrompt);
+        string json = BuildRequest(userText, systemPrompt, history);
 
         using var request = new UnityWebRequest(endpoint, "POST");
 
@@ -145,26 +155,31 @@ public class ChatGPTClient : MonoBehaviour
 
     private string BuildRequest(
         string userText,
-        string systemPrompt)
+        string systemPrompt,
+        IReadOnlyList<ChatRequest.Message> history)
     {
+        var messages = new List<ChatRequest.Message>
+        {
+            new ChatRequest.Message
+            {
+                role = "system",
+                content = systemPrompt
+            }
+        };
+
+        if (history != null)
+            messages.AddRange(history);
+
+        messages.Add(new ChatRequest.Message
+        {
+            role = "user",
+            content = userText
+        });
+
         ChatRequest request = new ChatRequest
         {
             model = model,
-
-            messages = new ChatRequest.Message[]
-            {
-                new ChatRequest.Message
-                {
-                    role = "system",
-                    content = systemPrompt
-                },
-
-                new ChatRequest.Message
-                {
-                    role = "user",
-                    content = userText
-                }
-            }
+            messages = messages.ToArray()
         };
 
         return JsonUtility.ToJson(request);

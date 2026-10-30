@@ -92,6 +92,9 @@ public class DialogueManager : MonoBehaviour
     // 送れなかった文章。次に「入力する」を選んだとき入力欄に戻す
     private string lastFailedInput;
 
+    // この会話でAIに送るそれまでのやり取り（あいさつ＋返答を受け取れたやり取り）。会話を始めるたびに空にする（README 4.3）
+    private readonly List<ChatGPTClient.ChatRequest.Message> conversationHistory = new();
+
     // 「初期位置に戻る」用に、ゲーム開始時のプレイヤーの位置・向きを記録しておく
     private Vector3 playerStartPosition;
     private Quaternion playerStartRotation;
@@ -368,6 +371,11 @@ public class DialogueManager : MonoBehaviour
 
         ExperimentLogger.Log("dialogue_start", npcId: CurrentNpcId, nodeId: id);
         TutorialGuide.Instance?.OnDialogueStarted(CurrentNpcId);
+
+        // 条件Bでは、参加者が見たあいさつからの流れをAIにも渡す（README 4.3）
+        conversationHistory.Clear();
+        if (FreeInputOnly && currentNode != null)
+            AddToHistory("assistant", currentNode.text);
 
         ShowNode();
     }
@@ -734,17 +742,28 @@ public class DialogueManager : MonoBehaviour
         waitingAnimation = StartCoroutine(AnimateWaitingText());
         SetKeyGuide("返事を待っています…");
 
+        // 今回より前のやり取りの往復数（あいさつは数えない。README 6.3）
+        int hist = conversationHistory.FindAll(m => m.role == "user").Count;
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var result = await chatGPT.SendChatMessage(
             text,
-            prompt.systemPrompt
+            prompt.systemPrompt,
+            conversationHistory
         );
         stopwatch.Stop();
 
         string shown = result.Success ? result.Text : AIErrorText;
         lastFailedInput = result.Success ? null : text;
 
-        string detail = "prompt=" + promptPath + ";hash=" + ExperimentLogger.Hash8(prompt.systemPrompt) + ";latency_ms=" + stopwatch.ElapsedMilliseconds;
+        // 返答を受け取れたやり取りだけ覚える。失敗したら同じ文で送り直すので入れない（README 4.3）
+        if (result.Success)
+        {
+            AddToHistory("user", text);
+            AddToHistory("assistant", result.Text);
+        }
+
+        string detail = "prompt=" + promptPath + ";hash=" + ExperimentLogger.Hash8(prompt.systemPrompt) + ";latency_ms=" + stopwatch.ElapsedMilliseconds + ";hist=" + hist;
         if (!result.Success)
             detail += ";error=" + result.Error;
         // 実際に使われたモデルの版。返事に無い項目は書かない（README 6.3）
@@ -756,6 +775,11 @@ public class DialogueManager : MonoBehaviour
         ExperimentLogger.Log("ai_response", npcId: npcId, nodeId: nodeId, text: shown, isError: !result.Success, detail: detail);
 
         ShowAIResponse(shown);
+    }
+
+    private void AddToHistory(string role, string content)
+    {
+        conversationHistory.Add(new ChatGPTClient.ChatRequest.Message { role = role, content = content });
     }
 
     // PromptData/S{話題セット番号}/ → NPCDialogue.promptData の順で探す（README 4.5）
@@ -814,6 +838,9 @@ public class DialogueManager : MonoBehaviour
     {
         ExperimentLogger.Log("dialogue_end", npcId: CurrentNpcId, detail: detail);
         TutorialGuide.Instance?.OnDialogueClosed(CurrentNpcId);
+
+        // 会話を閉じたら忘れる（README 4.3）
+        conversationHistory.Clear();
 
         currentState = GameState.FreeMove;
 
