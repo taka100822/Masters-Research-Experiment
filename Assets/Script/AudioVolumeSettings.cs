@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Audio;
 
 public enum VolumeType
 {
@@ -15,6 +16,7 @@ public class AudioVolumeSettings : MonoBehaviour
 
     [SerializeField, Range(0f, 1f)] private float defaultBGMVolume = 0.8f;
     [SerializeField, Range(0f, 1f)] private float defaultSEVolume = 0.8f;
+    [SerializeField] private SEVolumeTable seVolumeTable;
 
     public float BGMVolume { get; private set; }
     public float SEVolume { get; private set; }
@@ -35,6 +37,26 @@ public class AudioVolumeSettings : MonoBehaviour
 
         BGMVolume = defaultBGMVolume;
         SEVolume = defaultSEVolume;
+
+        if (seVolumeTable != null)
+            seVolumeTable.OnChanged += NotifyChanged;
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this && seVolumeTable != null)
+            seVolumeTable.OnChanged -= NotifyChanged;
+    }
+
+    // SEの標準音量（README 7.4.1）。表に無い音はfallback（AudioSourceのVolume）を使う
+    public float GetSEBaseVolume(AudioResource sound, float fallback)
+    {
+        return seVolumeTable != null ? seVolumeTable.GetVolume(sound, fallback) : fallback;
+    }
+
+    private void NotifyChanged()
+    {
+        OnChanged?.Invoke();
     }
 
     public float GetVolume(VolumeType type)

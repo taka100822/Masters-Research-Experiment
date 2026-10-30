@@ -1,6 +1,7 @@
 using UnityEngine;
 
-// AudioSourceに付けて、BGM／SEの設定音量を反映する（元の音量 × 設定音量）
+// AudioSourceに付けて、BGM／SEの設定音量を反映する（標準音量 × 設定音量）
+// SEの標準音量はSEVolumeTable、BGM（と表に無いSE）は元のAudioSourceのVolume
 [RequireComponent(typeof(AudioSource))]
 public class VolumeChannel : MonoBehaviour
 {
@@ -31,10 +32,18 @@ public class VolumeChannel : MonoBehaviour
 
     private void Apply()
     {
-        float volume = AudioVolumeSettings.Instance != null
-            ? AudioVolumeSettings.Instance.GetVolume(type)
-            : 1f;
+        var settings = AudioVolumeSettings.Instance;
+        if (settings == null)
+        {
+            source.volume = baseVolume;
+            return;
+        }
 
-        source.volume = baseVolume * volume;
+        // SEは表の標準音量を使う（README 7.4.1）。表に無い音はAudioSourceのVolumeのまま
+        float standard = type == VolumeType.SE
+            ? settings.GetSEBaseVolume(source.resource, baseVolume)
+            : baseVolume;
+
+        source.volume = standard * settings.GetVolume(type);
     }
 }

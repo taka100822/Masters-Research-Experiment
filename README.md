@@ -1034,6 +1034,26 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 * 初期値はBGM・SEとも80%。保存しない（1.4）
 * 新しい音を足すときは、その`AudioSource`に`VolumeChannel`を付ける
 
+### 7.4.1 SEごとの標準音量（`SEVolumeTable`）
+
+SEごとの音量の差（足音が大きすぎる、時間切れの音が小さい、など）を、1つのDataAssetでまとめて調整できるようにする。
+
+* `SEVolumeTable`（ScriptableObject）を`Assets/Settings/SEVolumeTable.asset`に1つだけ作る。中身は「音（`AudioResource`）と標準音量（0〜1）」の一覧
+  * キーを`AudioClip`ではなく`AudioResource`にするのは、足音が`AudioRandomContainer`（`Footstep_Concrete.asset`など）で鳴っているため。`AudioClip`も`AudioResource`なので、`TimeUp.mp3`もそのまま入れられる
+* 最初の中身（今の音量をそのまま移す。入れた時点では聞こえ方は変わらない）
+
+  | 音 | 鳴らしている`AudioSource` | 標準音量 |
+  |---|---|---|
+  | `Footstep_Concrete`（RandomContainer） | `Footstep_Concrete` | 1.0 |
+  | `Player_Land`（RandomContainer） | `Footstep_Land` | 1.0 |
+  | `TimeUp.mp3` | `TimeUpSE` | 1.0 |
+
+* `AudioVolumeSettings`（各シーンに1つ）がこのアセットを参照する。MainScene・TutorialSceneの両方に同じアセットを割り当てる
+* `VolumeChannel`（SE）の音量は「**標準音量（表）× 設定音量（スライダー）**」にする。表に無い音は、今まで通り`AudioSource`のVolumeを標準音量として使う（表に入れ忘れても音が消えない）
+* BGMは対象外（BGMは1曲ずつなので、今まで通り`AudioSource`のVolumeで調整する）
+* Playモード中に表の値を変えると、すぐに鳴っている音に反映される（聞きながら調整できる）。ScriptableObjectなので、Playモード中に変えた値もそのまま残る
+* 新しいSEを足すときは、`VolumeChannel`を付けたうえで、この表に1行足す
+
 ## 7.5 空とライティング
 
 * 空はAsset Storeの無料素材「Simple Sky - Cartoon assets」。シーンのルートの`Sky`の中に、空のドーム（`SkyDome`、村の中心(11, 0, 128)・スケール1.3・半径約430m）とローポリの雲12個（`Clouds`）を置いている。どれも影を落とさない
@@ -1085,7 +1105,7 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 | `PromptData`（ScriptableObject） | NPCのシステムプロンプト |
 | `MinimapUI` | ミニマップ |
 | `SettingsPanelUI` | 設定パネルのスライダー・ボタン |
-| `AudioVolumeSettings`／`VolumeChannel` | BGM・SE音量 |
+| `AudioVolumeSettings`／`VolumeChannel`／`SEVolumeTable` | BGM・SE音量、SEごとの標準音量（7.4.1） |
 | `LookSensitivitySettings` | 視点感度 |
 | `ExperimentLogger` | 実験ログ（6章） |
 | `GameState`（enum） | 4.1 |

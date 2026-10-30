@@ -652,6 +652,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AudioVolumeSettings
   defaultBGMVolume: 0.8
   defaultSEVolume: 0.8
+  seVolumeTable: {fileID: 11400000, guid: 743a59d0e2e2fb048876c4a56927dff3, type: 2}
 --- !u!114 &2089964
 MonoBehaviour:
   m_ObjectHideFlags: 0
