@@ -1139,13 +1139,14 @@ SEごとの音量の差（足音が大きすぎる、時間切れの音が小さ
 
 | 音 | 鳴らすとき | 鳴らさないとき |
 |---|---|---|
-| `DisplayDialog.mp3` | NPCのセリフを会話窓に出したとき（話しかけた最初のセリフ・Enterで次のノードへ進んだとき・選択肢を選んだ先のセリフ）。条件BでAIの返答、またはエラーの一文（4.6）を出したとき | 返事を待つ間の`……`の点の切り替え（4.6）。会話を閉じるとき |
-| `ChangeChoice.mp3` | 選択肢が出ている間に`↑`／`↓`でカーソルを動かしたとき（端から反対の端へ回り込むときも） | 選択肢が1つしか無くてカーソルが動かないとき。Enterで決めたとき（決めた先でセリフが出るので`DisplayDialog`が鳴る） |
+| `DisplayDialog.mp3` | 話しかけて会話窓が出たとき（最初のセリフ。条件A・Bとも） | 会話窓が出たままセリフが替わるとき（Enterで次のノードへ進んだとき・選択肢を選んだ先のセリフ・条件BのAIの返答やエラーの一文（4.6）・返事を待つ間の`……`の点の切り替え）。会話を閉じるとき |
+| `ChangeChoice.mp3` | 選択肢が出ている間に`↑`／`↓`でカーソルを動かしたとき（端から反対の端へ回り込むときも） | 選択肢が1つしか無くてカーソルが動かないとき。Enterで決めたとき |
 
-* セリフと選択肢が同時に出るノードでは、`DisplayDialog`だけが鳴る
+* 会話窓は話しかけてから会話を閉じるまで出たまま（自由入力の窓を出している間も消えない）なので、`DisplayDialog`は1回の会話で最初の1回だけ鳴る
+* 最初のセリフと選択肢が同時に出るノードでは、`DisplayDialog`だけが鳴る
 * 続けて押したときは、鳴っている音を止めて頭から鳴らし直す（重ねない）
 * **音量**：ほかのSEと同じく`VolumeChannel`（SE）を付け、`SEVolumeTable`に2行足した（標準音量はどちらも1.0から始めて、聞きながら調整する）
-* **実装**：`DialogueManager`に`displayDialogSE`・`changeChoiceSE`（`AudioSource`）を足す。`ShowNode`・`ShowAIResponse`で`displayDialogSE.Play()`、`HandleChoiceInput`の上下で`changeChoiceSE.Play()`。両シーンの`DialogueManager`の子に`AudioSource`を2つ置いて割り当てる
+* **実装**：`DialogueManager`に`displayDialogSE`・`changeChoiceSE`（`AudioSource`）を足す。会話窓を出す`StartNode`で`displayDialogSE.Play()`、`HandleChoiceInput`の上下で`changeChoiceSE.Play()`。両シーンの`DialogueManager`の子に`AudioSource`を2つ置いて割り当てる
 * **研究への影響**：なし（ログ・会話の中身は変わらない。音が増えるだけ）
 
 ## 7.5 空とライティング

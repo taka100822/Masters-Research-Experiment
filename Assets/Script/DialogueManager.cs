@@ -359,6 +359,8 @@ public class DialogueManager : MonoBehaviour
 
         dialoguePanel.SetActive(true);
         talkHint.SetActive(false);
+        // 会話窓が出たときだけ鳴らす。出たままセリフが替わるときは鳴らさない（README 7.4.3）
+        PlaySE(displayDialogSE);
 
         StopPlayer();
 
@@ -380,7 +382,6 @@ public class DialogueManager : MonoBehaviour
 
         dialogueText.text = JapaneseLineBreaker.Format(currentNode.text, dialogueText, maxDialogueLines);
         nameText.text = currentNPC != null ? currentNPC.DisplayName : "";
-        PlaySE(displayDialogSE);
 
         ExperimentLogger.Log("npc_line", npcId: CurrentNpcId, nodeId: currentNodeId, text: currentNode.text);
 
@@ -797,7 +798,6 @@ public class DialogueManager : MonoBehaviour
         choicePanel.SetActive(false);
 
         dialogueText.text = JapaneseLineBreaker.Format(reply, dialogueText, maxDialogueLines);
-        PlaySE(displayDialogSE);
         TutorialGuide.Instance?.OnDialogueAction();
 
         nextIndicator.SetActive(true);
