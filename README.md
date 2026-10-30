@@ -538,7 +538,7 @@ TextMeshProは日本語を1文字ごとにどこでも折り返すので、そ�
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ```
 
-* **アンケートを開く**（`OpenFormButton`）：真鍮の地（押す順に左から並べ、最初に押すものを主な操作にする）。押すと、ブラウザでGoogleフォーム「ゲーム体験アンケート」が、**プレイヤーIDと回が入った状態**で開く（事前入力URL）。何回押してもよい（そのたびにタブが開く）。押したことはログに書かない（2.5）
+* **アンケートを開く**（`OpenFormButton`）：真鍮の地（押す順に左から並べ、最初に押すものを主な操作にする）。押すと、**Chrome**でGoogleフォーム「ゲーム体験アンケート」が、**プレイヤーIDと回が入った状態**で開く（事前入力URL）。Chromeが入っていない・開けないときは既定のブラウザで開く（`Application.OpenURL`）。何回押してもよい（そのたびにタブが開く）。押したことはログに書かない（2.5）
   * 入れるのは「プレイヤーID」＝参加者ID（`ExperimentSettings.participantId`）と「何回目のプレイですか？」＝`1回目`／`2回目`（`ExperimentConfig.Round`。エディタでMainSceneを直接Playしたときは`1回目`）だけ。**条件・話題セットは入れない**（参加者の目に入るため。3.1と同じ考え）
   * URL：`https://docs.google.com/forms/d/e/1FAIpQLSch5ArOd7LTy5Y08wKCqhAbPFtd0PiVjQHsY3Fz0iQ8rceuVQ/viewform?usp=pp_url&entry.1776098365={ID}&entry.1533040520={回}`（値はURLエンコード）。フォームの質問を作り直すと`entry.`の番号が変わるので、そのときは`EndScreenUI`の定数（`FormUrl`・`IdEntry`・`RoundEntry`）を直す
   * 事前入力した欄は参加者が書き換えられる。フォーム側で、その2つの質問に「この欄は変えないでください」と書いておく

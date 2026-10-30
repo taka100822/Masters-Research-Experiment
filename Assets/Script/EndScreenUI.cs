@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using TMPro;
+using StarterAssets;
 
 // 時間切れのあとのアンケート画面と、2回目のあとのおわりの画面（README 3.7）
 // 終了画面（QuestCompletePanel）に付ける。DialogueManager.EndGameが表示したときに中身を整える
@@ -52,9 +53,27 @@ public class EndScreenUI : MonoBehaviour
         string id = ExperimentSettings.Instance != null ? ExperimentSettings.Instance.participantId : ExperimentConfig.ParticipantId;
         int round = ExperimentConfig.HasValue ? ExperimentConfig.Round : 1;
 
-        Application.OpenURL(FormUrl +
+        OpenInChrome(FormUrl +
             "&" + IdEntry + "=" + System.Uri.EscapeDataString(id ?? "") +
             "&" + RoundEntry + "=" + System.Uri.EscapeDataString(round + "回目"));
+    }
+
+    // Chromeで開く。入っていない・開けないときは既定のブラウザで開く（README 3.7）
+    private static void OpenInChrome(string url)
+    {
+        try
+        {
+            // UseShellExecuteなら、chrome.exeの場所はWindowsが登録情報（App Paths）から探す
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("chrome.exe", "\"" + url + "\"")
+            {
+                UseShellExecute = true,
+            });
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("Chromeで開けなかったので既定のブラウザで開きます: " + e.Message);
+            Application.OpenURL(url);
+        }
     }
 
     private void OnEnable()
@@ -62,6 +81,11 @@ public class EndScreenUI : MonoBehaviour
         // ボタンを押せるようにカーソルを出す
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
+
+        // フォームから戻ってフォーカスが戻ったとき、Starter Assetsがカーソルを固定し直さないようにする
+        var inputs = FindAnyObjectByType<StarterAssetsInputs>();
+        if (inputs != null)
+            inputs.cursorLocked = false;
 
         messageText.text = QuestionnaireText;
         ShowConfirm(false);
