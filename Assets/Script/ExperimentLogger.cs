@@ -159,7 +159,8 @@ public class ExperimentLogger : MonoBehaviour
             "app=" + Application.version +
             ";unity=" + Application.unityVersion +
             ";model=" + ChatGPTClient.ModelName +
-            ";platform=" + Application.platform);
+            ";platform=" + Application.platform +
+            ";round=" + ExperimentConfig.Round);
     }
 
     private void EndSession(string reason)

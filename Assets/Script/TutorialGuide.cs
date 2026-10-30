@@ -34,6 +34,11 @@ public class TutorialGuide : MonoBehaviour
     private const string KeyColor = "#E0B354";
     private const int LastStep = 6;
 
+    // 出すやることの番号。2回目は話しかけ・話し方・最後だけ（README 2.4「2回目の簡易版」）
+    private static readonly int[] FullSteps = { 1, 2, 3, 4, 5, 6 };
+    private static readonly int[] ShortSteps = { 2, 3, 6 };
+
+    private int[] steps = FullSteps;
     private int step;
     private bool completing;
     private bool waitingForStart;
@@ -81,8 +86,12 @@ public class TutorialGuide : MonoBehaviour
         else
             Debug.LogError("[Tutorial] やることの札（guidePanel）がありません。Tools/研究用/チュートリアルのシーンを作り直す で作り直してください");
 
-        ExperimentLogger.Log("tutorial_start", detail: "condition=" + (FreeInputOnly ? "B" : "A"));
-        ShowStep(1);
+        // 2回目は簡易版（README 2.4）。エディタでこのシーンを直接Playしたときは1回目扱い
+        bool secondPlay = ExperimentConfig.HasValue && ExperimentConfig.Round == 2;
+        steps = secondPlay ? ShortSteps : FullSteps;
+
+        ExperimentLogger.Log("tutorial_start", detail: "condition=" + (FreeInputOnly ? "B" : "A") + ";mode=" + (secondPlay ? "short" : "full") + ";round=" + ExperimentConfig.Round);
+        ShowStep(steps[0]);
     }
 
     private void Update()
@@ -227,7 +236,7 @@ public class TutorialGuide : MonoBehaviour
     {
         // 設定パネルを閉じた直後などtimeScaleに関係なく進める
         yield return new WaitForSecondsRealtime(advanceDelay);
-        ShowStep(step + 1);
+        ShowStep(steps[System.Array.IndexOf(steps, step) + 1]);
     }
 
     private void Finish()
