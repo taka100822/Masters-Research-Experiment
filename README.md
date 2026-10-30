@@ -1093,6 +1093,7 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 | SE | MainSceneの`GameManager`の子`TimeUpSE`。`Assets/Audio/TimeUp.mp3` | 時間切れの音（5.1）。`ExplorationTimer`が時間切れの瞬間に1回鳴らす。ループなし・起動時に再生しない・2D。読み込みはDecompress On Load |
 | SE | 3シーンのルートの`UIClickSound`。`Assets/Audio/Click.mp3` | ボタンのクリック音（7.4.2）。シーンをまたいでも途切れないよう`DontDestroyOnLoad`の`AudioSource`で鳴らす。読み込みはDecompress On Load |
 | SE | MainScene・TutorialSceneの`DialogueManager`の子`DisplayDialogSE`・`ChangeChoiceSE`。`Assets/Audio/DisplayDialog.mp3`・`ChangeChoice.mp3` | セリフを表示した音・選択肢を上下で動かした音（7.4.3）。ループなし・起動時に再生しない・2D。読み込みはDecompress On Load |
+| SE | MainScene・TutorialSceneの`DialogueManager`の子`DisplayHideModalSE`。`Assets/Audio/DisplayHideModal.mp3` | 設定パネルを開いた音・閉じた音（7.4.4）。ループなし・起動時に再生しない・2D。読み込みはDecompress On Load |
 
 * 初期値はBGM・SEとも80%。保存しない（1.4）
 * 新しい音を足すときは、その`AudioSource`に`VolumeChannel`を付ける（クリック音だけは例外。7.4.2）
@@ -1148,6 +1149,21 @@ SEごとの音量の差（足音が大きすぎる、時間切れの音が小さ
 * **音量**：ほかのSEと同じく`VolumeChannel`（SE）を付け、`SEVolumeTable`に2行足した（標準音量はどちらも1.0から始めて、聞きながら調整する）
 * **実装**：`DialogueManager`に`displayDialogSE`・`changeChoiceSE`（`AudioSource`）を足す。会話窓を出す`StartNode`で`displayDialogSE.Play()`、`HandleChoiceInput`の上下で`changeChoiceSE.Play()`。両シーンの`DialogueManager`の子に`AudioSource`を2つ置いて割り当てる
 * **研究への影響**：なし（ログ・会話の中身は変わらない。音が増えるだけ）
+
+### 7.4.4 設定パネルの開閉のSE
+
+設定パネル（3.8）を開いたときと閉じたときに、同じ短いSE（`Assets/Audio/DisplayHideModal.mp3`）を鳴らす。MainScene・TutorialScene共通。
+
+| 鳴らすとき | 鳴らさないとき |
+|---|---|
+| `Q`で開いたとき。`Q`・「閉じる」ボタン・「初期位置に戻る」で閉じたとき | 開けないとき（会話中・アンケート画面・チュートリアルの6の札のあと）。シーンを読み込んだとき（パネルは最初から閉じている） |
+
+* 「閉じる」「初期位置に戻る」はボタンなので、クリック音（7.4.2）と閉じる音が同時に鳴る
+* 開いている間は`Time.timeScale = 0`だが、`AudioSource`の再生は止まらないので、そのまま鳴る
+* 続けて開け閉めしたときは、鳴っている音を止めて頭から鳴らし直す（重ねない。7.4.3と同じ）
+* **音量**：ほかのSEと同じく`VolumeChannel`（SE）を付け、`SEVolumeTable`に1行足す（標準音量1.0から始めて、聞きながら調整する）
+* **実装**：`DialogueManager`に`displayHideModalSE`（`AudioSource`）を足し、`OpenSettings`・`CloseSettings`で`PlaySE(displayHideModalSE)`。閉じる経路（`Q`・`CloseSettingsFromButton`・`RespawnPlayer`）はすべて`CloseSettings`を通るので、そこ1か所で鳴る。両シーンの`DialogueManager`の子に`AudioSource`を1つ置いて割り当てる
+* **研究への影響**：なし（ログは変わらない。音が増えるだけ）
 
 ## 7.5 空とライティング
 
@@ -1327,5 +1343,37 @@ Claude Codeが本仕様書を参照し、Unity MCP経由で開発する。
 * 10.10.2（ログの点検スクリプト）は実装済み（6.8。2026-10-30）
 * 10.10.3（AIが返したモデル名を記録する）は実装済み（6.3・3.1。2026-10-30）。返事には版の名前も`system_fingerprint`も無く、版の変化までは分からないことが分かった
 * 10.10.4（次の参加者IDとグループごとの完了人数を出す）は実装済み（3.1。2026-10-30）
+
+## 10.11 自由入力でNPCが会話の流れを覚える（案・レビュー待ち）
+
+**問題**：今はAIに毎回「システムプロンプト＋今回の入力」だけを送っている（4.3）。そのため条件Bで「それってどこにあるの？」「さっきの人は？」のように前の発言を受けた質問をすると、NPCは何の話か分からず、話が噛み合わない。参加者には「AIなのに話がつながらない」と映り、自由入力という対話方式そのものの評価が下がってしまう（比べたいのは対話方式の違いで、履歴が無いことによる不自然さではない）。
+
+**決めること**：NPCは**1回の会話の中だけ**、それまでのやり取りを覚える。会話を閉じたら忘れる。
+
+* 覚える範囲：話しかけてから会話を閉じる（「会話をやめる」・時間切れ）まで。同じNPCに話しかけ直すと、また何も覚えていない状態から始まる
+  * 条件Aも話しかけるたびにノード`0`から始まる（4.4）ので、「話しかけ直すとリセット」は両条件でそろう
+  * 1プレイの間ずっと覚えさせる案は採らない。条件Aにはない「前の会話を覚えている」体験が条件Bにだけ加わり、条件の差が対話方式以外にも広がるため
+* AIに送るもの：`system`（プロンプト）→ `assistant`（ノード`0`のあいさつ）→ これまでの`user`／`assistant`のやり取り → `user`（今回の入力）
+  * あいさつも入れる。参加者が見たのはあいさつから始まる会話なので、AIも同じ流れを知っておく（あいさつを繰り返さない）
+  * 履歴に入れるのは**返答を受け取れたやり取りだけ**。エラーのときは入力も入れない（参加者は同じ文で送り直すので、二重に入らないように。4.6）。エラーの一文（ナレーション）も入れない
+  * 件数の上限は設けない（3分・1回の返答待ち数秒なので、1回の会話のやり取りは多くても十数往復）
+* プロンプト（スプレッドシート・`PromptData`）は変えない。ハッシュも変わらない
+* チュートリアル（2.4）の自由入力も同じ動きにする（本番と同じ話し方を練習するため）
+* 開発者用モーダルのAI接続確認（3.1）は今までどおり履歴なしで送る
+
+**ログ**：`ai_response`の`detail`に`hist=<数>`を足す（今回の入力より前に送った、この会話でのやり取りの往復数。あいさつは数えない）。最初の送信は`hist=0`。列は増やさない。エラーのときも書く。
+
+**研究への影響**（1.6：会話方式・ログ項目の変更）
+
+* 条件Bの対話がより自然になる。条件Aの会話・選択肢・プロンプト・制限時間は変わらない
+* 1回の会話の中で前の発言を踏まえた質問ができるようになり、条件Bで話題を聞き出しやすくなる可能性がある。これは「自由入力（生成AI）で話す」ことの本来の姿として条件Bに含める
+* 履歴を持つ前に条件Bで遊んだ参加者がいれば、そのデータとは条件が違う。`hist=`が`detail`に無いログは履歴なしの版と見分けられる
+* AIへの入力が長くなるので、返答待ちの時間がわずかに延びうる（`latency_ms`・`ai_wait_total`で把握する）
+
+**実装**（1ファイルずつ）
+
+1. `ChatGPTClient`：`SendChatMessage(userText, systemPrompt, history)`を足す（`history`は`role`と`content`の並び。今の2引数版は残し、中で空の履歴を渡す）
+2. `DialogueManager`：会話を始めたら履歴を空にし、ノード`0`を表示したとき（条件Bのみ）あいさつを`assistant`として入れる。`SubmitTypedText`で履歴を付けて送り、成功したら`user`・`assistant`を足す。`CloseDialogue`で空にする。`ai_response`の`detail`に`hist=`を足す
+3. 仕様を4.3・4.5・6.3に移し、1.8・10.4の「履歴は保留」を直し、[`docs/history.md`](docs/history.md)に経緯を書く
 
 ---

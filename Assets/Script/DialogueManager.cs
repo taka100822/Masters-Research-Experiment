@@ -60,6 +60,8 @@ public class DialogueManager : MonoBehaviour
     [Header("SE")]
     [SerializeField] private AudioSource displayDialogSE;
     [SerializeField] private AudioSource changeChoiceSE;
+    // 設定パネルを開いた音・閉じた音（README 7.4.4）
+    [SerializeField] private AudioSource displayHideModalSE;
 
     [Header("Player")]
     [SerializeField] private ThirdPersonController playerController;
@@ -886,6 +888,7 @@ public class DialogueManager : MonoBehaviour
 
         Time.timeScale = 0f;
         settingsPanel.Open();
+        PlaySE(displayHideModalSE);
 
         ExperimentLogger.Log("settings_open");
         TutorialGuide.Instance?.OnSettingsOpened();
@@ -911,6 +914,8 @@ public class DialogueManager : MonoBehaviour
         ExperimentLogger.Log("settings_close");
 
         settingsPanel.Close();
+        // Q・「閉じる」・「初期位置に戻る」のどれで閉じてもここを通る（README 7.4.4）
+        PlaySE(displayHideModalSE);
         Time.timeScale = 1f;
 
         ResetPlayerInputs();
