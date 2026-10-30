@@ -15,6 +15,9 @@ public class ExplorationTimer : MonoBehaviour
     [SerializeField] private GameObject timerPanel;
     [SerializeField] private TMP_Text timerText;
 
+    [Header("時間切れのSE（未設定でも動く。README 5.1）")]
+    [SerializeField] private AudioSource timeUpSound;
+
     public bool IsRunning { get; private set; }
     public bool IsTimeUp { get; private set; }
 
@@ -71,6 +74,8 @@ public class ExplorationTimer : MonoBehaviour
         {
             IsRunning = false;
             IsTimeUp = true;
+            if (timeUpSound != null)
+                timeUpSound.Play();
             OnTimeUp?.Invoke();
         }
     }

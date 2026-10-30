@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
@@ -18,8 +19,12 @@ public class EndScreenUI : MonoBehaviour
     [SerializeField] private Button yesButton;
     [SerializeField] private Button noButton;
 
+    [Header("BGM（アンケート画面を出したらフェードアウトして止める。README 3.7）")]
+    [SerializeField] private AudioSource bgm;
+    [SerializeField] private float bgmFadeSeconds = 1.5f;
+
     private const string QuestionnaireText =
-        "時間になりました\n\n<size=24>お疲れさまでした。アンケートに回答してください。\n回答が終わったら、下のボタンを押してください。</size>";
+        "時間になりました\n\n<size=24>お疲れさまでした。\n担当者の指示があるまでお待ちください。</size>";
     private const string FinishedText =
         "以上で終わりです\n\n<size=24>ご協力ありがとうございました。\n実験者の指示があるまでお待ちください。</size>";
 
@@ -38,6 +43,20 @@ public class EndScreenUI : MonoBehaviour
 
         messageText.text = QuestionnaireText;
         ShowConfirm(false);
+
+        if (bgm != null && bgm.isPlaying)
+            StartCoroutine(FadeOutBGM());
+    }
+
+    private IEnumerator FadeOutBGM()
+    {
+        float startVolume = bgm.volume;
+        for (float t = 0f; t < bgmFadeSeconds; t += Time.unscaledDeltaTime)
+        {
+            bgm.volume = startVolume * (1f - t / bgmFadeSeconds);
+            yield return null;
+        }
+        bgm.Stop();
     }
 
     private void ShowConfirm(bool confirm)
