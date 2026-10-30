@@ -43,6 +43,7 @@ public class TitleMenuUI : MonoBehaviour
     // ログの保存先に書き込めるかを確かめる（README 3.1）。未設定なら何もしない
     [Header("ログ保存")]
     [SerializeField] private TMP_Text logCheckText;
+    private static readonly Color LogCheckPendingColor = new Color32(0xE0, 0xB3, 0x54, 0xFF);  // 真鍮
 
     private void Start()
     {
@@ -108,17 +109,27 @@ public class TitleMenuUI : MonoBehaviour
         if (logCheckText == null)
             return;
 
-        if (ExperimentLogger.CanWrite(out string error))
-        {
-            logCheckText.color = AICheckOkColor;
-            logCheckText.text = "OK";
-        }
-        else
+        if (!ExperimentLogger.CanWrite(out string error))
         {
             logCheckText.color = errorText.color;
             logCheckText.text = "失敗：このフォルダに書き込めません";
             Debug.LogWarning("[Log Check] failed: " + error);
+            return;
         }
+
+        // Excelなどで開いたままだと、集計の行がsummary.csvに書けない（README 3.1）
+        if (ExperimentLogger.IsSummaryLocked(out error))
+        {
+            logCheckText.color = errorText.color;
+            logCheckText.text = "失敗：summary.csvが開かれています（Excelなどを閉じてください）";
+            Debug.LogWarning("[Log Check] summary.csv locked: " + error);
+            return;
+        }
+
+        // 前に書けなかった集計が残っていれば、写し忘れないように知らせる
+        int pending = ExperimentLogger.CountPendingSummaries();
+        logCheckText.color = pending > 0 ? LogCheckPendingColor : AICheckOkColor;
+        logCheckText.text = pending > 0 ? "OK（summary.csvに写していない集計が" + pending + "件あります）" : "OK";
     }
 
     // 同じIDの本番のログが既にあれば知らせる。「2回目から」のやり直しもあるので止めない（README 3.1）

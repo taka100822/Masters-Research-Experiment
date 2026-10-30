@@ -43,6 +43,36 @@ public class ExperimentLogger : MonoBehaviour
         }
     }
 
+    private static string SummaryPath => Path.Combine(LogDirectory, "summary.csv");
+    private const string PendingSummaryPrefix = "summary_pending_";
+
+    // summary.csvが他のアプリ（Excelなど）に開かれていて書けないか。書かずにすぐ閉じる（README 3.1）
+    public static bool IsSummaryLocked(out string error)
+    {
+        error = null;
+        if (!File.Exists(SummaryPath))
+            return false;
+
+        try
+        {
+            using (new FileStream(SummaryPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)) { }
+            return false;
+        }
+        catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+        {
+            error = e.Message;
+            return true;
+        }
+    }
+
+    // summary.csvに書けなかったときに残した集計（summary_pending_…csv）の数（README 6.7）
+    public static int CountPendingSummaries()
+    {
+        return Directory.Exists(LogDirectory)
+            ? Directory.GetFiles(LogDirectory, PendingSummaryPrefix + "*.csv").Length
+            : 0;
+    }
+
     // そのIDの本番のログの数（チュートリアルは数えない）。IDの打ち間違いに気づくため（README 3.1）
     // P1とP10を取り違えないよう、IDの後ろの「_」まで含めて比べる
     public static int CountSessionLogs(string participantId)
@@ -198,7 +228,22 @@ public class ExperimentLogger : MonoBehaviour
             ";unity=" + Application.unityVersion +
             ";model=" + ChatGPTClient.ModelName +
             ";platform=" + Application.platform +
-            ";round=" + ExperimentConfig.Round);
+            ";round=" + ExperimentConfig.Round +
+            ";" + BuildInfo);
+    }
+
+    // どのビルドで遊んだか（README 6.3）。ビルドの前にBuildInfoWriterが書く
+    // エディタでは前のビルドのファイルが残っていても使わず、build=editor にする
+    private static string BuildInfo
+    {
+        get
+        {
+            if (Application.isEditor)
+                return "build=editor";
+
+            var file = Resources.Load<TextAsset>("build_info");
+            return file != null ? file.text.Trim() : "build=unknown";
+        }
     }
 
     private void EndSession(string reason)
@@ -397,10 +442,12 @@ public class ExperimentLogger : MonoBehaviour
                 ? n + "/" + talkSeconds[id].ToString("0.0", CultureInfo.InvariantCulture)
                 : "0/0.0");
 
+        string headerLine = ToCsvLine(header.ToArray());
+        string rowLine = ToCsvLine(row.ToArray());
+
         try
         {
-            string path = Path.Combine(LogDirectory, "summary.csv");
-            string headerLine = ToCsvLine(header.ToArray());
+            string path = SummaryPath;
 
             // 列の違う古いsummary.csv（クエスト版など）があれば、別名で残して新しく作り直す
             if (File.Exists(path))
@@ -420,11 +467,24 @@ public class ExperimentLogger : MonoBehaviour
             using var sw = new StreamWriter(path, true, new UTF8Encoding(true));
             if (isNew)
                 sw.WriteLine(headerLine);
-            sw.WriteLine(ToCsvLine(row.ToArray()));
+            sw.WriteLine(rowLine);
         }
         catch (Exception e)
         {
-            Debug.LogError("[Log] Could not write summary.csv: " + e.Message);
+            // Excelなどで開かれていて書けないときは、別のファイルに残す。summary.csvへは実験者が写す（README 6.7）
+            try
+            {
+                string pending = Path.Combine(LogDirectory, PendingSummaryPrefix +
+                    DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) + "_" + SafeFileName(participantId) + ".csv");
+                using var sw = new StreamWriter(pending, false, new UTF8Encoding(true));
+                sw.WriteLine(headerLine);
+                sw.WriteLine(rowLine);
+                Debug.LogWarning("[Log] summary.csv is locked (" + e.Message + "). Wrote " + pending + " instead");
+            }
+            catch (Exception e2)
+            {
+                Debug.LogError("[Log] Could not write summary.csv: " + e.Message + " / " + e2.Message);
+            }
         }
     }
 

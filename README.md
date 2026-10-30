@@ -324,10 +324,18 @@ MainScene：説明画面（3.7）→ Enter → 本番5分
   * 失敗しても「決定」「はじめる」は押せる（条件Aの回や動作確認では、AIが無くても進められるように）。止めるかどうかは実験者が決める
   * 実験ログには書かない（まだセッションが始まっていない。6.1）。Consoleに`[AI Check] ok 1.9s`／`[AI Check] failed: no_key`と出すだけ
   * **実装**：TitleSceneのルートの`AIClient`に`ChatGPTClient`を付けてある。`TitleMenuUI`の「AI接続」（`chatGPT`・`aiCheckText`・`aiCheckButton`。未設定なら何もしない）。`OpenDeveloperModal`と「もう一度」が`CheckAIConnection`を呼ぶ
-* **ログ保存**（`Label3`・`LogCheckText`）：ログの保存先（6.2）に書き込めるかを確かめる。モーダルを**開くたびに**、保存先のフォルダを作り、短いファイル（`.write_check_….tmp`）を書いてすぐ消す。書けたら`OK`（漆喰色）、書けなければ`失敗：このフォルダに書き込めません`（赤系）。理由はConsoleに`[Log Check] failed: …`
+* **ログ保存**（`Label3`・`LogCheckText`）：ログの保存先（6.2）に書き込めるかを確かめる。モーダルを**開くたびに**、保存先のフォルダを作り、短いファイル（`.write_check_….tmp`）を書いてすぐ消す。`summary.csv`があれば、書き込み用に開けるかも試す（書かずにすぐ閉じる）。表示は次のとおり（22px、2行まで折り返す。右にボタンが無いので、窓の右の余白まで広げてある）
+
+  | 状態 | 表示 |
+  |---|---|
+  | どちらも書ける | `OK`（漆喰色） |
+  | フォルダに書けない | `失敗：このフォルダに書き込めません`（赤系）。理由はConsoleに`[Log Check] failed: …` |
+  | `summary.csv`が他のアプリに開かれていて書けない | `失敗：summary.csvが開かれています（Excelなどを閉じてください）`（赤系）。理由はConsoleに`[Log Check] summary.csv locked: …` |
+  | 書けるが、`summary_pending_….csv`（6.7）が残っている | `OK（summary.csvに写していない集計が1件あります）`（真鍮色） |
+
   * ログを作れないとき、ゲームは止まらずに進み、ビルド版では気づけない（`ExperimentLogger`はConsoleにエラーを出すだけ）。失敗と出たら、ビルドを書き込める場所へ移す（保存先は下の「ログ保存先：」）
   * 失敗しても「決定」「はじめる」は止めない。ログ・summary.csvには何も足さない
-  * **実装**：`ExperimentLogger.CanWrite`を`TitleMenuUI.CheckLogWrite`（`OpenDeveloperModal`から）が呼び、`logCheckText`に出す
+  * **実装**：`ExperimentLogger`の`CanWrite`・`IsSummaryLocked`・`CountPendingSummaries`を`TitleMenuUI.CheckLogWrite`（`OpenDeveloperModal`から）が呼び、`logCheckText`に出す
 * **同じIDの注意**：IDを打つたびに（モーダルを開いたときも）、ログの保存先にそのIDの本番のログ（`{ID}_…csv`。`_tutorial`は数えない）がいくつあるかを数え、1つ以上あればエラーの行（`ErrorText`）に`注意：このIDの本番のログが既に2件あります`と出す。打ち間違えて前の人と同じIDで始めないように
   * **止めない**（「決定」は押せる）。「2回目から」でやり直すときは1回目のログがあるのが正しいため。実験者が見て判断する
   * IDの大文字・小文字は区別しない（`p005`も`P005`と同じに数える）。`P1`と`P10`は取り違えない（IDの後ろの`_`まで比べる）
@@ -897,7 +905,7 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 
 | event_type | いつ | 主な記録内容 |
 |---|---|---|
-| `session_start` | MainSceneの開始時 | `detail`にアプリのバージョン・Unityバージョン・AIモデル名・プラットフォーム・何回目のプレイか（`round=1`／`2`。2.5）（参加者ID・条件・話題セットは全行の列に入る） |
+| `session_start` | MainSceneの開始時 | `detail`にアプリのバージョン・Unityバージョン・AIモデル名・プラットフォーム・何回目のプレイか（`round=1`／`2`。2.5）・どのビルドか（`build=`・`built=`。下の「ビルドの記録」）（参加者ID・条件・話題セットは全行の列に入る） |
 | `explore_start` | 説明画面を閉じて探索を始めた（5分の数え始め） | `detail`に制限時間（`duration=300`） |
 | `dialogue_start` | NPCに話しかけた | NPC ID・開始ノードID（いつも0） |
 | `npc_line` | NPCのセリフが表示された | NPC ID・ノードID・セリフ |
@@ -917,6 +925,9 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 * 会話時間（`dialogue_end`の`duration`）・会話ごとの選択回数と自由入力回数は、`ExperimentLogger`が自分で計算して書く
 * 時間切れ（`time_up`）からアンケート画面（`session_end`）までの超過時間は、2つの`play_time`の差で分かる
 * **プロンプトの識別子**：使った`PromptData`の場所（例：`S1/NPC005`）と、本文のハッシュ値（先頭8文字）。実験期間中にプロンプトが変わっていないかを後から確認できる（1.5）
+* **ビルドの記録**：`session_start`の`detail`の最後に`build=724f571;built=20261030_152000`のように入る（チュートリアルのログも同じ）。`build`はビルドしたときのgitのコミット（`git rev-parse --short HEAD`）で、コミットしていない変更があれば後ろに`-dirty`、gitが使えなければ`unknown`。`built`はビルドした日時。エディタでPlayしたときは`build=editor`（`built`なし）。`app=`（Player Settingsのバージョン）は手で上げないと同じままなので、ビルドの区別はこちらで行う
+  * 本番は**コミットしてからビルドする**（`-dirty`の付かないビルド）と、`build=`から使ったコード・会話・プロンプトをgitで正確にたどれる。エディタでPlayするとフォント（`NotoSansJP-Regular SDF.asset`）に文字が足されて変更が出ることがあるので、ビルドの前にコミットするか戻す
+  * **実装**：エディタ用の`BuildInfoWriter`（`IPreprocessBuildWithReport`）がビルドの前に`Assets/Resources/build_info.txt`を書き、`ExperimentLogger.BuildInfo`が読む（エディタでは読まない）
 
 ## 6.4 時間
 
@@ -974,6 +985,10 @@ session_id,participant_id,condition,set,start_time,end_reason,total_play_time,ex
 * `talk_NPC00x`：そのNPCとの会話の回数と合計時間（例：`3/42.5`＝3回・42.5秒）
 * イベントログから計算し直せる内容だが、条件A・Bの比較をすぐできるように用意する
 * 既にある`summary.csv`の1行目が今の列と違う（クエスト版のものなど）ときは、`summary_old_{日時}.csv`に名前を変えてから新しく作る（列がずれた行が混ざらないように）
+* **`summary.csv`に書けないとき**（実験者がExcelで開いたままにしていてロックされている、など）は、同じフォルダに`summary_pending_{日時}_{参加者ID}.csv`を作り、`summary.csv`と同じ見出し行＋その1行を書く（Consoleに`[Log] summary.csv is locked (…). Wrote … instead`）。行を失わないため
+  * `summary.csv`へは**実験者が写す**（自動ではまとめない。ロックが続いているときに、ゲームが勝手に`summary.csv`を書き換えないように）。写したら`summary_pending_…`は消す
+  * 残っている間は、開発者用モーダルの「ログ保存」に件数が出る（3.1）
+  * **実装**：`ExperimentLogger.AppendSummary`の`catch`で書く
 
 ---
 
@@ -1037,6 +1052,7 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 | `Assets/PurchasedAssets/`（Village・Starter Assets・キャラクター・Simple Skyなど） | 購入アセットなので`.gitignore`で除外 | 同じアセットをインポートして`Assets/PurchasedAssets/`に置く（Simple Skyは`Assets/PurchasedAssets/SimpleSky/`） |
 | `ThirdPersonController.cs`への変更（`StopMotion()`・ジャンプを無くすなど） | 上のフォルダの中にあるため | 同じ変更を手で入れる（`StopMotion()`が無いと`DialogueManager`がコンパイルエラーになる。ジャンプは7.3のとおり消す） |
 | `Assets/Resources/openai_key.txt` | APIキー | 自分のAPIキーを書いたファイルを置く |
+| `Assets/Resources/build_info.txt`（と`.meta`） | ビルドのたびに作り直すため（6.3） | 何もしなくてよい（ビルドの前に自動で作られる） |
 | `Assets/ExperimentLogs/`（エディタで記録したログ） | 実験データ | — |
 
 `Assets/Fonts/`も`.gitignore`の対象だが、使っているフォントとマテリアル（`NotoSansJP-Regular SDF.asset`・`NameOutline.mat`・`TitleOutline.mat`）は個別に登録してある。新しく足すときも`git add -f`で登録する。
@@ -1074,6 +1090,7 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 | `PromptSheetImporter`（エディタ用） | メニュー「Tools/研究用」：プロンプトをスプレッドシートから取り込む（4.7） |
 | `DialogueSheetImporter`（エディタ用） | メニュー「Tools/研究用」：会話テキストをスプレッドシートから取り込む（4.8） |
 | `SheetCsv`（エディタ用・static） | スプレッドシートをCSVで読む（上の2つで共通） |
+| `BuildInfoWriter`（エディタ用） | ビルドの前に、ビルドした日時とgitのコミットを`build_info.txt`に書く（6.3） |
 | `QuestData`（ScriptableObject）・`QuestManager`・`QuestPanelUI` | **使っていない**（クエスト版。1.7）。シーンからは外し、ファイルとデータ（`Resources/Quest/`）だけ残している |
 
 ---
@@ -1174,5 +1191,12 @@ Claude Codeが本仕様書を参照し、Unity MCP経由で開発する。
 * 10.8.2（同じ参加者IDのログが既にあれば知らせる）は実装済み（3.1。2026-10-30）
 * 10.8.3（アンケート画面に「アンケートを開く」を足す）は実装済み（3.7・2.5。2026-10-30）
 * 10.8.4（アプリが2つ同時に起動しないようにする）は実装済み（2.5。2026-10-30）
+
+## 10.9 集計の行を失わない・どのビルドで遊んだかを残す（実装済み）
+
+ログの集計（6.7）が黙って欠けるのを防ぎ、どのビルドで遊んだかをログに残すようにした。参加者が遊ぶ内容（会話・選択肢・プロンプト・制限時間）は変えていない（1.4）。`session_start`の`detail`に`build`・`built`が増えた（ログ項目の変更。1.6。列は増えていない）。仕様は該当する章に移した。問題・理由・確認結果は[`docs/history.md`](docs/history.md#2026-10-30-集計の行を失わないどのビルドで遊んだかを残す)。
+
+* 10.9.1（summary.csvに書けないときも集計の行を残す）は実装済み（6.7・3.1。2026-10-30）
+* 10.9.2（どのビルドで遊んだかをログに残す）は実装済み（6.3・7.7。2026-10-30）
 
 ---

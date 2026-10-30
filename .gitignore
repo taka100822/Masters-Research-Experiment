@@ -110,6 +110,8 @@ InitTestScene*.unity*
 PurchasedAssets
 Fonts
 Assets/Resources/*.txt
+# ビルドの前に書くビルド情報（README 6.3）
+Assets/Resources/build_info.txt.meta
 # 実験ログ（README 6.2）
 ExperimentLogs/
 Assets/ExperimentLogs.meta
