@@ -3,10 +3,7 @@
 > この README がこのプロジェクトの仕様書です。**今どう動くか**だけを書きます。実装と食い違いがあれば、コードと README の両方を確認して README を直します。
 > 新しい機能は、まずこの README に設計を書き（**案・レビュー待ち**）、承認されてから実装します（**実装済み**）。9章を参照。
 > もとは初期の仕様書 `Document_chatGPT.md`（本文中では「元仕様書」）を実装と照合して書き直したもの。元仕様書は削除済みで、`git show ad08eb8:Assets/Document_chatGPT.md` で読める。
->
-> 2026-10-09に、実験の課題をクエストから「村を5分間自由に探索する」に変えた（1.7）。
-> 2026-10-29に、条件Bを「選択肢＋自由入力」から「自由入力のみ」に変えた（1.8）。同じ日に、各プレイの前のチュートリアルを足し（2.4）、プロンプトをスプレッドシートで編集するようにし（4.7）、参加者IDを入れるだけで2回分を続けて進めるようにした（2.5）。
-> 2026-10-30に、会話のセリフもスプレッドシートで編集するようにした（4.8）。
+> いつ何を変えたかは10.5の「変更の記録」。研究にかかわる大きな変更は、課題をクエストから自由探索へ（1.7）と、条件Bを自由入力のみへ（1.8）の2つ。
 >
 > | ファイル | 中身 |
 > |---|---|
@@ -21,7 +18,7 @@
 3. [画面とUI](#3-画面とui)
 4. [会話システム](#4-会話システム)
 5. [探索と会話の内容](#5-探索と会話の内容)
-6. [実験ログ](#6-実験ログ承認実装済み)
+6. [実験ログ](#6-実験ログ)
 7. [環境・アセット](#7-環境アセット)
 8. [クラス一覧](#8-クラス一覧)
 9. [開発の進め方](#9-開発の進め方)
@@ -71,7 +68,7 @@
 
 ゲームとしての面白さより、実験条件の統制を優先する。マップ・NPCの配置・会話の型と話題の量・制限時間・UI・操作・BGM/SE・グラフィックは、両条件・両セットで同じにする。主な違いは対話方式だけにする。
 
-* 2つの話題セットの対応は5.6、会話の型の統一は5.3
+* 2つの話題セットの対応は[`docs/topic-sets.md`](docs/topic-sets.md)、会話の型の統一は5.3
 * ミニマップ・NPCの名前表示・残り時間・説明画面の文は、両条件・両セットで同じように出る
 * 音量・視点感度は**保存せず、起動するたびに初期値に戻す**（前の参加者の設定が次の参加者に引き継がれないように）
 
@@ -108,7 +105,7 @@ Unityバージョン・AIモデル・API仕様・NPCプロンプト・会話デ�
 * プレイ時間：探索3分（＋説明画面）
 * マップ：村1つ（`Assets/MainScene.unity`、購入アセットのVillageを使用）
 * NPC：6人。話題セットごとに名前・性格・話題・衣装が変わる（5.2）
-* 話題セット：2つ。1回のプレイでは設定で選んだ1つだけを使う
+* 話題セット：2つ。1回のプレイでは1つだけを使う（参加者IDと回から自動で決まる。2.5）
 * セーブ：なし（1回のプレイを最初から最後まで行う）
 
 ## 2.2 ゲームの流れ
@@ -264,7 +261,7 @@ MainScene：説明画面（3.7）→ Enter → 本番3分
 * 効くのはTutorialSceneとMainSceneで、**どの状態でも**（説明画面・会話中・選択肢中・自由入力中・設定パネル表示中・アンケート画面・おわりの画面）。自由入力中でも欄に文字は入らない（`Ctrl`を押しながらなので）
 * 画面のどこにも書かない（参加者に見せないため。以前は設定パネルにボタンがあったが外した。3.8）。3つ同時押しなので、参加者が誤って押すことはまず無い
 * アンケート画面・おわりの画面では、本番のログは時間切れの`session_end`（`time_up`）で閉じているので、ログには何も足さない
-* 実装：`DialogueManager.Update()`の頭で`Keyboard.current`の`ctrlKey`・`shiftKey`が押されていて`tKey.wasPressedThisFrame`なら`BackToTitle()`（`ExperimentLogger.EndSessionNow("back_to_title")`→`Time.timeScale = 1`→`SceneManager.LoadScene("TitleScene")`）。以前`SettingsPanelUI.OnClickTitle()`がしていた処理を移す
+* 実装：`DialogueManager.Update()`の頭で`Keyboard.current`の`ctrlKey`・`shiftKey`が押されていて`tKey.wasPressedThisFrame`なら`BackToTitle()`（`ExperimentLogger.EndSessionNow("back_to_title")`→`Time.timeScale = 1`→`SceneManager.LoadScene("TitleScene")`）
 * おわりの画面にはボタンが無い。実験者はアプリを閉じ、次の参加者は起動し直してIDを入れる
 
 **実装**：`ExperimentConfig`が参加者ID・回（`Round`）を持ち、条件・話題セットはIDと回から計算する（`GroupOf`・`ConditionOf`・`TopicSetOf`）。アンケート画面の「はい」で`EndScreenUI`が`ExperimentConfig.AdvanceToSecondRound()`を呼んでTutorialSceneを開く
@@ -589,7 +586,7 @@ TextMeshProは日本語を1文字ごとにどこでも折り返すので、そ�
 
 **ログ**：「閉じる」ボタンで閉じても`settings_close`は`Q`のときと同じに書く。
 
-**実装**：「閉じる」ボタンは`SettingsPanelUI.closeButton`→`DialogueManager.CloseSettingsFromButton()`（`InSettings`のときだけ`CloseSettings()`）。MainSceneでは`SettingsPanel`の下に`Backdrop`・`Bg`・`ActionGroup`（`RespawnButton`・`CaptionText`）・`CloseButton`。以前の「Q：閉じる」（`HintText`）は非表示。以前あった`TitleButton`・`ConfirmGroup`と、`SettingsPanelUI`の`titleButton`・`actionGroup`・`confirmGroup`・`confirmTitleButton`・`cancelTitleButton`・`ShowTitleConfirm()`・`OnClickTitle()`は消す（TutorialSceneはMainSceneから作り直す。2.4）
+**実装**：「閉じる」ボタンは`SettingsPanelUI.closeButton`→`DialogueManager.CloseSettingsFromButton()`（`InSettings`のときだけ`CloseSettings()`）。MainSceneでは`SettingsPanel`の下に`Backdrop`・`Bg`・`ActionGroup`（`RespawnButton`・`CaptionText`）・`CloseButton`。`HintText`（以前の「Q：閉じる」）は非表示のまま残してある
 
 ---
 
@@ -712,7 +709,7 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 ```
 
 * 【村の人たち】があるので、自由入力で「他に誰がいるの？」と聞かれても、存在しない人を作らずに答えられる
-* 【知らない情報】と【会話のルール】は全員同じ文面。各人の部分は5.4・5.5
+* 【知らない情報】と【会話のルール】は全員同じ文面。各人の部分は5.4
 
 ## 4.6 AIの返答が得られなかったとき
 
@@ -753,8 +750,7 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 **取り込み**：メニュー **Tools → 研究用 → プロンプトをスプレッドシートから取り込む**（`PromptSheetImporter`、エディタ用。Play中は実行できない）
 
 1. シートをCSVで書き出すURL（`…/export?format=csv&gid=0`）から`UnityWebRequest`で読む（20秒で打ち切り）。読めない・CSVでない返事（閲覧権限が無いとログイン画面が返る）のときは、理由を窓に出して何もしない
-2. 各行について`Assets/Resources/PromptData/{folder}/{npcId}.asset`と比べる。改行コードは`
-`にそろえ、先頭・末尾の空白は消してから比べる
+2. 各行について`Assets/Resources/PromptData/{folder}/{npcId}.asset`と比べる。改行コードは`\n`にそろえ、先頭・末尾の空白は消してから比べる
 3. 違う行があれば確認の窓を出す：変わる人の一覧（例：`S1/NPC003 1a2b3c4d → 9f8e7d6c`。ハッシュは6章と同じ`ExperimentLogger.Hash8`）と「実験期間中はプロンプトを変えないでください（README 1.5）」。「取り込む」を押したときだけ書き換えて保存する。アセットが無ければ新しく作る。シートに無いアセットは消さない
 4. 終わったらConsoleに`[PromptSheet] 変更 2・新規 0・同じ 12`のように出す。変わった人ごとに新しいハッシュも出す。何も変わらなければ「変わったプロンプトはありません」の窓だけ出す
 * folder・npcIdが両方空の行は飛ばす。folderが`S1`／`S2`／`Tutorial`以外・npcIdが空・npcIdが重複・systemPromptが空の行は取り込まずにConsoleに警告を出す
@@ -853,18 +849,18 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 
 条件Aの会話の型。条件Bではノード`0`だけを使う（4.2）。**会話はいつも`0`から始まる**（4.4）。1人につき話題を2つ持ち、選択肢でどちらも聞ける。
 
-| id | 内容 | 選択肢・遷移 | 入力 | action |
-|---|---|---|---|---|
-| 0 | あいさつ（1行） | 少しお話ししてもいいですか？ → 10 ／ いえ、なんでもないです → 90 | | |
-| 10 | 「何の話をしようか」など | お仕事は何をされてるんですか？ → 20 ／ 村の人のことを教えてください → 30 | ○（10） | |
-| 20 | 話題1の前半 | → 21 | | `topic:1` |
-| 21 | 話題1の後半 | 村の人のことも教えてください → 30 ／ ありがとうございました → 99 | ○（21） | |
-| 30 | 話題2の前半 | → 31 | | `topic:2` |
-| 31 | 話題2の後半 | お仕事のことも聞かせてください → 20 ／ ありがとうございました → 99 | ○（31） | |
-| 90 | 「そう、またね」など | 終 | | |
-| 99 | 別れのあいさつ | 終 | | |
+| id | 内容 | 選択肢・遷移 | action |
+|---|---|---|---|
+| 0 | あいさつ（1行） | 少しお話ししてもいいですか？ → 10 ／ いえ、なんでもないです → 90 | |
+| 10 | 「何の話をしようか」など | お仕事は何をされてるんですか？ → 20 ／ 村の人のことを教えてください → 30 | |
+| 20 | 話題1の前半 | → 21 | `topic:1` |
+| 21 | 話題1の後半 | 村の人のことも教えてください → 30 ／ ありがとうございました → 99 | |
+| 30 | 話題2の前半 | → 31 | `topic:2` |
+| 31 | 話題2の後半 | お仕事のことも聞かせてください → 20 ／ ありがとうございました → 99 | |
+| 90 | 「そう、またね」など | 終 | |
+| 99 | 別れのあいさつ | 終 | |
 
-* 選択肢は1ノード最大2つ（4.2）。CSVの形式（4.4）はクエスト版と同じ。表の「入力」列（`allowInput`）は今は使っていない
+* 選択肢は1ノード最大2つ（4.2）。CSVの形式（4.4）はクエスト版と同じ
 * `action`は`topic:<番号>`（話題を聞いた。ログの`topic_heard`）だけを使う
 * 話題1（**仕事のこと**）はその人自身の仕事・暮らし、話題2（**村の人のこと**）は別の村人1人の居場所・人柄。話題2で紹介される人は、各セットで6人とも1回ずつになるようにする（誰かの話から次に話す人を見つけられる）
 * 選択肢の文は**主人公がNPCに話すことば**（です・ます）で、全員・両セットで同じ。21と31の1つ目は、まだ聞いていない方の話題を名指しして進む（話題1のあとは話題2へ、話題2のあとは話題1へ）。どの選択肢も**16字まで**（選択肢の窓が会話窓の左半分まで伸びないように。3.3）
@@ -892,13 +888,13 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 
 ---
 
-# 6. 実験ログ（承認・実装済み）
+# 6. 実験ログ
 
 研究の分析に使うデータを、プレイ中に自動でファイルへ記録する（`ExperimentLogger`）。
 
 ## 6.1 方針
 
-* **1プレイ（タイトルの「はじめる」〜終了）＝1セッション＝1ファイル**。1行に1つの出来事（イベント）を書く
+* **1プレイ（MainSceneの開始〜終了）＝1セッション＝1ファイル**。1行に1つの出来事（イベント）を書く。チュートリアル（2.4）は別のファイルに書く
 * セッションの終わりに、集計結果を**1行だけ**`summary.csv`（全セッション共通）に追記する
 * 途中でアプリが落ちても記録が残るよう、**1行書くたびにファイルへ書き出す**
 * 文字コードはUTF-8（BOM付き）。Excelで開いても文字化けしない
@@ -980,10 +976,8 @@ id, text, nextId, choiceA, choiceA_next, choiceB, choiceB_next, allowInput, acti
 
 | クラス | 場所 | イベント |
 |---|---|---|
-| `DialogueManager` | `StartNode`／`ShowNode`／`ExecuteNodeAction`／選択肢の決定／`SubmitTypedText`／`ShowAIResponse`／`CloseDialogue`／`HandleTimeUp`／`OpenSettings`／`CloseSettings`／`RespawnPlayer` | dialogue_start／npc_line／topic_heard／choice_select／free_input_submit／ai_response／dialogue_end／time_up／settings_open／settings_close／respawn |
+| `DialogueManager` | `StartNode`／`ShowNode`／`ExecuteNodeAction`／選択肢の決定／`SubmitTypedText`／`ShowAIResponse`／`CloseDialogue`／`HandleTimeUp`／`OpenSettings`／`CloseSettings`／`RespawnPlayer`／`BackToTitle`（開発者用コマンド。2.5）／`EndGame`（アンケート画面） | dialogue_start／npc_line／topic_heard／choice_select／free_input_submit／ai_response／dialogue_end／time_up／settings_open／settings_close／respawn／session_end（back_to_title・time_up） |
 | `ExplorationTimer` | `Begin` | explore_start |
-| `DialogueManager` | 開発者用コマンド`Ctrl+Shift+T`（2.5） | session_end（back_to_title） |
-| `DialogueManager` | `EndGame`（アンケート画面） | session_end（time_up） |
 | `ExperimentLogger` | 開始時／アプリ終了時（エディタのPlay停止も含む） | session_start／session_end（app_quit） |
 
 ## 6.6 イベントログの形式
@@ -1099,6 +1093,7 @@ AudioMixerは使わず、音量を1か所（`AudioVolumeSettings`）で持ち、
 | SE | 3シーンのルートの`UIClickSound`。`Assets/Audio/Click.mp3` | ボタンのクリック音（7.4.2）。シーンをまたいでも途切れないよう`DontDestroyOnLoad`の`AudioSource`で鳴らす。読み込みはDecompress On Load |
 | SE | MainScene・TutorialSceneの`DialogueManager`の子`DisplayDialogSE`・`ChangeChoiceSE`。`Assets/Audio/DisplayDialog.mp3`・`ChangeChoice.mp3` | セリフを表示した音・選択肢を上下で動かした音（7.4.3）。ループなし・起動時に再生しない・2D。読み込みはDecompress On Load |
 | SE | MainScene・TutorialSceneの`DialogueManager`の子`DisplayHideModalSE`。`Assets/Audio/DisplayHideModal.mp3` | 設定パネルを開いた音・閉じた音（7.4.4）。ループなし・起動時に再生しない・2D。読み込みはDecompress On Load |
+| SE | MainScene・TutorialSceneの`DialogueManager`の子`DecideSE`。`Assets/Audio/Decide.mp3` | 選択肢を決めた音・自由入力を送信した音（7.4.5）。ループなし・起動時に再生しない・2D。読み込みはDecompress On Load |
 
 * 初期値はBGM・SEとも80%。保存しない（1.4）
 * 新しい音を足すときは、その`AudioSource`に`VolumeChannel`を付ける（クリック音だけは例外。7.4.2）
@@ -1109,13 +1104,18 @@ SEごとの音量の差（足音が大きすぎる、時間切れの音が小さ
 
 * `SEVolumeTable`（ScriptableObject）を`Assets/Settings/SEVolumeTable.asset`に1つだけ作る。中身は「音（`AudioResource`）と標準音量（0〜1）」の一覧
   * キーを`AudioClip`ではなく`AudioResource`にするのは、足音が`AudioRandomContainer`（`Footstep_Concrete.asset`など）で鳴っているため。`AudioClip`も`AudioResource`なので、`TimeUp.mp3`もそのまま入れられる
-* 最初の中身（今の音量をそのまま移す。入れた時点では聞こえ方は変わらない）
+* 今の中身
 
   | 音 | 鳴らしている`AudioSource` | 標準音量 |
   |---|---|---|
   | `Footstep_Concrete`（RandomContainer） | `Footstep_Concrete` | 1.0 |
   | `Player_Land`（RandomContainer） | `Footstep_Land` | 1.0 |
-  | `TimeUp.mp3` | `TimeUpSE` | 1.0 |
+  | `TimeUp.mp3` | `TimeUpSE` | 0.2 |
+  | `Click.mp3` | `UIClickSoundSource`（7.4.2） | 0.5 |
+  | `DisplayDialog.mp3` | `DisplayDialogSE`（7.4.3） | 0.6 |
+  | `ChangeChoice.mp3` | `ChangeChoiceSE`（7.4.3） | 0.6 |
+  | `DisplayHideModal.mp3` | `DisplayHideModalSE`（7.4.4） | 0.4 |
+  | `Decide.mp3` | `DecideSE`（7.4.5） | 1.0 |
 
 * `AudioVolumeSettings`（各シーンに1つ）がこのアセットを参照する。MainScene・TutorialSceneの両方に同じアセットを割り当てる
 * `VolumeChannel`（SE）の音量は「**標準音量（表）× 設定音量（スライダー）**」にする。表に無い音は、今まで通り`AudioSource`のVolumeを標準音量として使う（表に入れ忘れても音が消えない）
@@ -1128,16 +1128,16 @@ SEごとの音量の差（足音が大きすぎる、時間切れの音が小さ
 マウスで押せる`Button`を押すと、`Assets/Audio/Click.mp3`（約1秒）が鳴る。3シーン共通。
 
 * **鳴らす対象**：シーンのルートに置いた`UIClickSound`が、起動時にシーン内の`Button`（非表示のものも含む）を集めて、`onClick`に「クリック音を鳴らす」を足す。ボタンを1つずつ設定しなくてよい。実行中にボタンを生成する所は無いので、これで全部に付く
-  * タイトル画面：「はじめる」「開発者設定」、開発者設定の「決定」「キャンセル」「もう一度」
+  * タイトル画面：「はじめる」「開発者用」、開発者用モーダルの「決定」「キャンセル」「もう一度」
   * 設定パネル：「初期位置に戻る」「閉じる」
-  * 会話UI：「送信」（条件B）・「会話をやめる」
-  * アンケート画面：「回答する」「完了」、確認の「はい」「いいえ」
-  * `interactable = false`のボタン（入力が空の「送信」、準備中の「はじめる」など）は押せないので鳴らない
-* **鳴らさないもの**：キーボードの操作（Enterでセリフを送る・選択肢を決める、`Q`で設定を開く、など）とスライダー
+  * 会話UI：「会話をやめる」（条件B）
+  * アンケート画面：「アンケートを開く」「アンケート回答完了」、確認の「はい」「いいえ」
+  * `interactable = false`のボタン（準備中の「はじめる」など）は押せないので鳴らない
+* **鳴らさないもの**：キーボードの操作（Enterでセリフを送る・選択肢を決める、`Q`で設定を開く、など）とスライダー。会話UIの「送信」（代わりに決定の音が鳴る。7.4.5）
+  * 対象から外すボタンには`NoClickSound`（目印だけのコンポーネント）を付ける。`UIClickSound`は付いているボタンを飛ばす。今は両シーンの`SendButton`だけ
 * **シーンをまたいでも途切れない**：`UIClickSound`は最初に鳴らすときに`DontDestroyOnLoad`の`AudioSource`（`UIClickSoundSource`、2D）を1つ作り、それで`PlayOneShot`する（3シーンで共有）
 * **音量**：ほかのSEと同じく「**標準音量（`SEVolumeTable`）× 効果音の設定音量**」。`VolumeChannel`はシーンごとの`AudioVolumeSettings`に結び付くので使わず、鳴らす瞬間に`AudioVolumeSettings.Instance`から同じ計算で求める
   * TitleSceneにも`AudioVolumeSettings`を置いている（同じ`SEVolumeTable.asset`。設定パネルが無いのでSEは初期値の80%のまま）
-  * `SEVolumeTable`の`Click.mp3`の標準音量は1.0
 
 ### 7.4.3 会話のSE
 
@@ -1151,9 +1151,8 @@ SEごとの音量の差（足音が大きすぎる、時間切れの音が小さ
 * 会話窓は話しかけてから会話を閉じるまで出たまま（自由入力の窓を出している間も消えない）なので、`DisplayDialog`は1回の会話で最初の1回だけ鳴る
 * 最初のセリフと選択肢が同時に出るノードでは、`DisplayDialog`だけが鳴る
 * 続けて押したときは、鳴っている音を止めて頭から鳴らし直す（重ねない）
-* **音量**：ほかのSEと同じく`VolumeChannel`（SE）を付け、`SEVolumeTable`に2行足した（標準音量はどちらも1.0から始めて、聞きながら調整する）
-* **実装**：`DialogueManager`に`displayDialogSE`・`changeChoiceSE`（`AudioSource`）を足す。会話窓を出す`StartNode`で`displayDialogSE.Play()`、`HandleChoiceInput`の上下で`changeChoiceSE.Play()`。両シーンの`DialogueManager`の子に`AudioSource`を2つ置いて割り当てる
-* **研究への影響**：なし（ログ・会話の中身は変わらない。音が増えるだけ）
+* **音量**：ほかのSEと同じく`VolumeChannel`（SE）を付け、標準音量は`SEVolumeTable`（7.4.1）
+* **実装**：`DialogueManager`の`displayDialogSE`・`changeChoiceSE`（`AudioSource`。両シーンの`DialogueManager`の子）。会話窓を出す`StartNode`で`displayDialogSE`、`HandleChoiceInput`の上下で`changeChoiceSE`を`PlaySE`で鳴らす
 
 ### 7.4.4 設定パネルの開閉のSE
 
@@ -1166,9 +1165,22 @@ SEごとの音量の差（足音が大きすぎる、時間切れの音が小さ
 * 「閉じる」「初期位置に戻る」はボタンなので、クリック音（7.4.2）と閉じる音が同時に鳴る
 * 開いている間は`Time.timeScale = 0`だが、`AudioSource`の再生は止まらないので、そのまま鳴る
 * 続けて開け閉めしたときは、鳴っている音を止めて頭から鳴らし直す（重ねない。7.4.3と同じ）
-* **音量**：ほかのSEと同じく`VolumeChannel`（SE）を付け、`SEVolumeTable`に1行足す（標準音量1.0から始めて、聞きながら調整する）
-* **実装**：`DialogueManager`に`displayHideModalSE`（`AudioSource`）を足し、`OpenSettings`・`CloseSettings`で`PlaySE(displayHideModalSE)`。閉じる経路（`Q`・`CloseSettingsFromButton`・`RespawnPlayer`）はすべて`CloseSettings`を通るので、そこ1か所で鳴る。両シーンの`DialogueManager`の子に`AudioSource`を1つ置いて割り当てる
-* **研究への影響**：なし（ログは変わらない。音が増えるだけ）
+* **音量**：ほかのSEと同じく`VolumeChannel`（SE）を付け、標準音量は`SEVolumeTable`（7.4.1）
+* **実装**：`DialogueManager`の`displayHideModalSE`（`AudioSource`。両シーンの`DialogueManager`の子）を、`OpenSettings`・`CloseSettings`で`PlaySE`で鳴らす。閉じる経路（`Q`・`CloseSettingsFromButton`・`RespawnPlayer`）はすべて`CloseSettings`を通るので、そこ1か所で鳴る
+
+### 7.4.5 決定のSE
+
+会話で、選択肢を決めたとき（条件A）と自由入力を送信したとき（条件B）に、同じ短いSE（`Assets/Audio/Decide.mp3`、約0.79秒）を鳴らす。MainScene・TutorialScene共通。
+
+| 鳴らすとき | 鳴らさないとき |
+|---|---|
+| 選択肢が出ている間に`Enter`で決めたとき（`choice_select`をログに書くのと同じ瞬間。時間切れのあとで、決めたあと会話を閉じるときも） | 選択肢の無いセリフを`Enter`で送るとき。自由入力の窓での`Enter`（送信しない。4.1）。「会話をやめる」で閉じたとき |
+| 自由入力の窓で「送信」を押したとき（`free_input_submit`をログに書くのと同じ瞬間。AIの返事を待つ前に鳴る） | 入力が空で「送信」を押せないとき（7.4.2） |
+
+* 「送信」はボタンだが、クリック音（7.4.2）は鳴らさず決定の音だけを鳴らす（`SendButton`に`NoClickSound`）
+* 続けて鳴らしたときは、鳴っている音を止めて頭から鳴らし直す（重ねない。7.4.3と同じ）
+* **音量**：ほかのSEと同じく`VolumeChannel`（SE）を付け、標準音量は`SEVolumeTable`（7.4.1）
+* **実装**：`DialogueManager`の`decideSE`（`AudioSource`。両シーンの`DialogueManager`の子`DecideSE`）を、`HandleChoiceInput`の`ChoiceSubmitPressed()`の中と`SubmitTypedText`の先頭で`PlaySE`で鳴らす
 
 ## 7.5 空とライティング
 
@@ -1205,7 +1217,8 @@ SEごとの音量の差（足音が大きすぎる、時間切れの音が小さ
 |---|---|
 | `GameManager` | シングルトン。MainScene全体で使うコンポーネント（`ChatGPTClient`など）を持つGameObjectの目印 |
 | `ExperimentConfig`（static） | タイトル画面で設定した参加者ID・回を各シーンへ渡す。IDの番号からグループ・条件・話題セットを計算する（2.5） |
-| `ExperimentSettings` | 参加者ID・条件・話題セット番号（MainScene） |
+| `ExperimentSettings` | 参加者ID・条件・話題セット番号（MainScene・TutorialScene） |
+| `ExplorationSettings`（ScriptableObject） | 制限時間と残り時間の合図の秒数（`Resources/ExplorationSettings.asset`。5.1） |
 | `TitleMenuUI` | タイトル画面のボタンと開発者用モーダル（AIへの接続の確認も。TitleScene） |
 | `EndScreenUI` | 時間切れのあとのアンケート画面（アンケートを開く）とおわりの画面。1回目のあとは2回目のチュートリアルへ（3.7・2.5） |
 | `DialogueManager` | 会話の進行・会話UI・状態管理の中心。説明画面、時間切れの扱い、プレイヤーの停止、設定パネルの開閉、初期位置に戻る処理も担当 |
@@ -1222,7 +1235,7 @@ SEごとの音量の差（足音が大きすぎる、時間切れの音が小さ
 | `MinimapUI` | ミニマップ |
 | `SettingsPanelUI` | 設定パネルのスライダー・ボタン |
 | `AudioVolumeSettings`／`VolumeChannel`／`SEVolumeTable` | BGM・SE音量、SEごとの標準音量（7.4.1） |
-| `UIClickSound` | ボタンのクリック音（7.4.2） |
+| `UIClickSound`／`NoClickSound` | ボタンのクリック音と、それを鳴らさないボタンの目印（7.4.2） |
 | `LookSensitivitySettings` | 視点感度 |
 | `ExperimentLogger` | 実験ログ（6章） |
 | `GameState`（enum） | 4.1 |
@@ -1245,7 +1258,7 @@ Claude Codeが本仕様書を参照し、Unity MCP経由で開発する。
 1. 新しい機能・変更は、まずREADMEに設計を書き、見出しに「**案・レビュー待ち**」と付ける（問題・理由・研究への影響も書く）
 2. ユーザーが確認・承認する
 3. 承認後に実装する（1ファイルずつ）
-4. 実装したら、READMEには**今の仕様**（どう動くか・見た目・実装の構成）だけを残し、問題・理由・研究への影響・確認結果は[`docs/history.md`](docs/history.md)に日付を付けて移す
+4. 実装したら、READMEには**今の仕様**（どう動くか・見た目・実装の構成）だけを残し、問題・理由・研究への影響・確認結果は[`docs/history.md`](docs/history.md)に日付を付けて移す。10.5の「変更の記録」に1行足す
 5. セリフ・プロンプトはスプレッドシートを直してから取り込む（4.8・4.7）。話題（誰が誰を紹介するか）を変えたときは[`docs/topic-sets.md`](docs/topic-sets.md)の対応表も直す
 
 ## 9.2 基本ルール
@@ -1271,10 +1284,10 @@ Claude Codeが本仕様書を参照し、Unity MCP経由で開発する。
 | 5 | 自由入力 | ✅ |
 | 6 | OpenAI API | ✅ |
 | 7 | クエスト（2件）・条件の切り替え | ✅（2026-10-09に自由探索へ置き換え。1.7） |
-| 7' | 自由探索（説明画面・5分の制限時間・話題セット2つ） | ✅（2026-10-09） |
+| 7' | 自由探索（説明画面・制限時間・話題セット2つ） | ✅（2026-10-09。制限時間は2026-10-30に5分から3分へ） |
 | — | タイトル画面・設定パネル・ミニマップ・BGM・空 | ✅ |
 | 8 | 実験ログ | ✅（6章） |
-| 9 | 実験用の調整（UI調整・ログ確認・プレイ時間の調整・実験手順の確認） | 未着手 |
+| 9 | 実験用の調整（チュートリアル・1人2回の自動進行・UI調整・ログの控えと点検・プレイ時間の調整） | 進行中（済んだものは10.5。残りは10.3） |
 
 ## 10.2 MVPチェックリスト
 
@@ -1283,7 +1296,7 @@ Claude Codeが本仕様書を参照し、Unity MCP経由で開発する。
 * [x] 条件Bで自由入力し、AIの返答をNPCのセリフとして表示できる
 * [x] AIの返答中・会話中はプレイヤーが動かず、会話を閉じると操作が戻る
 * [x] 説明画面から3分間探索でき、時間切れで（会話中なら区切りで）アンケート画面になる
-* [x] タイトル画面で条件A／Bと話題セットを切り替えられる
+* [x] 参加者IDから条件A／Bと話題セットが決まり、1人2回を続けて進められる（2.5）
 * [ ] 日本語を入力できる（`TMP_InputField`の日本語IMEは実機で要確認）
 * [x] 会話・自由入力・会話時間・話題・時間切れをログに保存できる（6章）
 
@@ -1299,57 +1312,38 @@ Claude Codeが本仕様書を参照し、Unity MCP経由で開発する。
 * 環境音
 * より自然な会話演出
 
-## 10.5 遊び方を分かりやすくする（実装済み）
+## 10.5 変更の記録
 
-参加者が迷いそうな所を5つ直す。どれも**両条件・両セットで同じ**に出すか、条件Bにしかない操作（自由入力）のつまずきを減らすだけで、会話の内容・選択肢・プロンプト・制限時間・ログ項目は変えない（1.4・1.6）。5つとも実装し、仕様は該当する章に移した。問題・理由・確認結果は[`docs/history.md`](docs/history.md#2026-10-30-遊び方を分かりやすくする)。
+実装した変更の一覧。仕様は「今の仕様」の節に書いてあり、問題・理由・研究への影響・確認結果は[`docs/history.md`](docs/history.md)にある（リンク先）。「研究仕様」の列は、1.6の項目（実験条件・制限時間・ログ項目・プロンプト・会話方式など）に触れたかどうか。
 
-* 10.5.1（説明画面に念押しを足す）は実装済み（3.7。2026-10-30）
-* 10.5.2（残り1分で残り時間の色を変える）は実装済み（5.1・3.7・2.4。2026-10-30）
-* 10.5.3（2回目のチュートリアルで「話し方が変わる」と知らせる）は実装済み（2.4。2026-10-30）
-* 10.5.4（自由入力でEnterを押したら「送信」を目立たせる）は実装済み（3.3。2026-10-30）
-* 10.5.5（AIの返事を待っている間「……」を動かす）は実装済み（4.6。2026-10-30）
+| 日付 | 変更 | 今の仕様 | 研究仕様 |
+|---|---|---|---|
+| 2026-10-05 | [会話UIのデザイン](docs/history.md#2026-10-05-会話uiのデザイン)・[タイトル画面](docs/history.md#2026-10-05-タイトル画面のデザイン)・[設定パネル](docs/history.md#2026-10-05-設定パネルのデザイン) | 3.1・3.2・3.3・3.8 | — |
+| 2026-10-05 | [会話の本文の改行](docs/history.md#2026-10-05-会話の本文の改行) | 3.4 | — |
+| 2026-10-05 | [AIの返答が得られなかったとき](docs/history.md#2026-10-05-aiの返答が得られなかったとき) | 4.6 | — |
+| 2026-10-05 | [片付け・NPCの名前の変更](docs/history.md#2026-10-05-片付けnpcの名前の変更) | 5.2 | — |
+| 2026-10-09 | [課題をクエストから自由探索へ](docs/history.md#2026-10-09-課題の変更クエストから自由探索へ) | 1.7 | 課題・ログ項目 |
+| 2026-10-29 | [条件Bを自由入力のみにする](docs/history.md#2026-10-29-条件bを自由入力のみにする) | 1.8・4.3 | 実験条件・会話方式 |
+| 2026-10-29 | [チュートリアル](docs/history.md#2026-10-29-チュートリアル) | 2.4 | 手順（別のログファイル） |
+| 2026-10-29 | [プロンプトをスプレッドシートで編集する](docs/history.md#2026-10-29-プロンプトをスプレッドシートで編集する) | 4.7 | — |
+| 2026-10-29 | [1人2回の自動進行](docs/history.md#2026-10-29-1人2回の自動進行) | 2.5 | 手順（`round=`が増えた） |
+| 2026-10-30 | [会話テキストをスプレッドシートで編集する](docs/history.md#2026-10-30-会話テキストをスプレッドシートで編集する) | 4.8 | — |
+| 2026-10-30 | [遊び方を分かりやすくする](docs/history.md#2026-10-30-遊び方を分かりやすくする)（説明画面の念押し・残り1分の合図・2回目の札・Enterで「送信」を目立たせる・返事待ちの「……」） | 3.7・5.1・2.4・3.3・4.6 | — |
+| 2026-10-30 | [実験当日の準備と小さな修正](docs/history.md#2026-10-30-実験当日の準備と小さな修正)（AI接続の確認・返事待ちのEnter） | 3.1・3.3 | — |
+| 2026-10-30 | [会話の文を直す：場所を前提にしない・選択肢を主人公のことばに](docs/history.md#2026-10-30-会話の文を直す場所を前提にしない選択肢を主人公のことばに) | 5.3・3.3 | セリフ・プロンプトの文（型・話題は同じ） |
+| 2026-10-30 | [データを確実に残す・アンケートを開きやすくする](docs/history.md#2026-10-30-データを確実に残すアンケートを開きやすくする)（ログ保存の確認・同じIDの注意・「アンケートを開く」・二重起動の防止） | 3.1・3.7・2.5 | — |
+| 2026-10-30 | [集計の行を失わない・どのビルドで遊んだかを残す](docs/history.md#2026-10-30-集計の行を失わないどのビルドで遊んだかを残す) | 6.7・6.3・7.7 | ログ項目（`session_start`に`build=`・`built=`） |
+| 2026-10-30 | [実験後アンケート：理由を質問ごとに聞く](docs/history.md#2026-10-30-実験後アンケート理由を質問ごとに聞く) | （ゲームの外） | アンケート |
+| 2026-10-30 | [クリスに先に話しかけられないようにする](docs/history.md#2026-10-30-クリスに先に話しかけられないようにする) | 2.4 | — |
+| 2026-10-30 | [「タイトルへ戻る」を開発者用コマンドにする](docs/history.md#2026-10-30-タイトルへ戻るを開発者用コマンドにする) | 2.5・3.8 | — |
+| 2026-10-30 | [制限時間を3分にする](docs/history.md#2026-10-30-制限時間を3分にする) | 5.1 | 制限時間 |
+| 2026-10-30 | [ボタンのクリック音](docs/history.md#2026-10-30-ボタンのクリック音) | 7.4.2 | — |
+| 2026-10-30 | [ログを守る・点検する・参加者の割り振りを崩さない](docs/history.md#2026-10-30-ログを守る点検する参加者の割り振りを崩さない)（ログの控え・点検スクリプト・返事のモデル名・次のID） | 6.2・6.8・6.3・3.1 | ログ項目（`ai_response`に`resp_model=`・`fp=`） |
+| 2026-10-30 | [自由入力でNPCが会話の流れを覚える](docs/history.md#2026-10-30-自由入力でnpcが会話の流れを覚える) | 4.3・6.3 | 会話方式・ログ項目（`hist=`） |
+| 2026-10-30 | [SEの標準音量・会話のSE・設定パネルの開閉のSE](docs/history.md#2026-10-30-seの標準音量会話のse設定パネルの開閉のse) | 7.4.1・7.4.3・7.4.4 | — |
+| 2026-10-30 | [決定のSE・SEの先頭の無音を切る](docs/history.md#2026-10-30-決定のseseの先頭の無音を切る) | 7.4.5・7.4.2 | — |
 
-## 10.6 実験当日の準備と小さな修正（実装済み）
-
-本番の前に実験者がAIにつながるかを確かめられるようにし、AIの返事待ちの間のEnterで操作案内が光る不具合を直した。どちらも参加者が遊ぶ内容（会話・選択肢・プロンプト・制限時間）とログ項目は変えていない（1.4・1.6）。仕様は該当する章に移した。問題・理由・確認結果は[`docs/history.md`](docs/history.md#2026-10-30-実験当日の準備と小さな修正)。
-
-* 10.6.1（開発者用モーダルでAIへの接続を確かめる）は実装済み（3.1。2026-10-30）
-* 10.6.2（AIの返事待ちの間はEnterに反応しない）は実装済み（3.3。2026-10-30）
-
-## 10.7 会話の文を直す：場所を前提にしない・選択肢を主人公のことばに（実装済み）
-
-店先で客を迎えるような話し方をやめ（セリフとプロンプトの両方）、選択肢を主人公がNPCに話すことばにした。会話の型・遷移・`action`・話題の中身・ログ項目は変えていない（1.4・1.6）。仕様は5.3・3.3に移した。直した文の一覧・問題・理由・確認結果は[`docs/history.md`](docs/history.md#2026-10-30-会話の文を直す場所を前提にしない選択肢を主人公のことばに)。
-
-* 10.7.1（お店の前にいるような話し方をやめる）は実装済み（5.3。シート「NPC会話テキスト」「NPCプロンプト」。2026-10-30）
-* 10.7.2（選択肢を主人公のことばにする）は実装済み（5.3・3.3。2026-10-30）
-
-## 10.8 データを確実に残す・アンケートを開きやすくする（実装済み）
-
-実験の当日に、ログが残らない・IDを取り違える・アンケートとログが結びつかない、といった失敗を防ぐ。参加者が遊ぶ内容（会話・選択肢・プロンプト・制限時間）・ログ項目・アンケートの質問は変えていない（1.4・1.6）。仕様は該当する章に移した。問題・理由・確認結果は[`docs/history.md`](docs/history.md#2026-10-30-データを確実に残すアンケートを開きやすくする)。
-
-* 10.8.1（開発者用モーダルでログを書き込めるかを確かめる）は実装済み（3.1。2026-10-30）
-* 10.8.2（同じ参加者IDのログが既にあれば知らせる）は実装済み（3.1。2026-10-30）
-* 10.8.3（アンケート画面に「アンケートを開く」を足す）は実装済み（3.7・2.5。2026-10-30）
-* 10.8.4（アプリが2つ同時に起動しないようにする）は実装済み（2.5。2026-10-30）
-
-## 10.9 集計の行を失わない・どのビルドで遊んだかを残す（実装済み）
-
-ログの集計（6.7）が黙って欠けるのを防ぎ、どのビルドで遊んだかをログに残すようにした。参加者が遊ぶ内容（会話・選択肢・プロンプト・制限時間）は変えていない（1.4）。`session_start`の`detail`に`build`・`built`が増えた（ログ項目の変更。1.6。列は増えていない）。仕様は該当する章に移した。問題・理由・確認結果は[`docs/history.md`](docs/history.md#2026-10-30-集計の行を失わないどのビルドで遊んだかを残す)。
-
-* 10.9.1（summary.csvに書けないときも集計の行を残す）は実装済み（6.7・3.1。2026-10-30）
-* 10.9.2（どのビルドで遊んだかをログに残す）は実装済み（6.3・7.7。2026-10-30）
-
-## 10.10 ログを守る・点検する・参加者の割り振りを崩さない（実装済み）
-
-実験期間中に、ログが1か所にしかなくて失われる、欠けや食い違いに後まで気づかない、AIの中身が知らないうちに変わる、グループの人数が偏る、といった「後から取り直せない」失敗を防ぐ。参加者が遊ぶ内容（会話・選択肢・プロンプト・制限時間・UI）は変えていない（1.4）。`ai_response`の`detail`に`resp_model`・`fp`が増えた（ログ項目の変更。1.6。列は増えていない）。仕様は該当する章に移した。問題・理由・確認結果は[`docs/history.md`](docs/history.md#2026-10-30-ログを守る点検する参加者の割り振りを崩さない)。
-
-* 10.10.1（ログの控えを自動で取る）は実装済み（6.2・3.1。2026-10-30）
-* 10.10.2（ログの点検スクリプト）は実装済み（6.8。2026-10-30）
-* 10.10.3（AIが返したモデル名を記録する）は実装済み（6.3・3.1。2026-10-30）。返事には版の名前も`system_fingerprint`も無く、版の変化までは分からないことが分かった
-* 10.10.4（次の参加者IDとグループごとの完了人数を出す）は実装済み（3.1。2026-10-30）
-
-## 10.11 自由入力でNPCが会話の流れを覚える（実装済み）
-
-条件Bで前の発言を受けた質問をすると話が噛み合わなかったので、NPCが**1回の会話の中だけ**それまでのやり取りを覚えるようにした。条件Aの会話・選択肢・プロンプト・制限時間は変えていない。会話方式（条件B）と`ai_response`の`detail`（`hist=`が増えた。列は増えていない）の変更（1.6）。仕様は4.3・6.3に移した。問題・理由・研究への影響・確認結果は[`docs/history.md`](docs/history.md#2026-10-30-自由入力でnpcが会話の流れを覚える)。
+* ログ項目が増えた変更は、どれも`detail`に`key=value`を足しただけで、列は増えていない（6.6）。足される前の版のログにはその`key`が無い
+* 新しい変更を実装したら、この表に1行足す（9.1）
 
 ---
