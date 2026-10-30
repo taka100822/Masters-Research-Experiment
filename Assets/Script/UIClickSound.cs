@@ -15,7 +15,11 @@ public class UIClickSound : MonoBehaviour
     {
         var buttons = FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (var button in buttons)
+        {
+            if (button.GetComponent<NoClickSound>() != null)
+                continue;
             button.onClick.AddListener(Play);
+        }
     }
 
     private void Play()

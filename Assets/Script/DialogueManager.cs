@@ -62,6 +62,8 @@ public class DialogueManager : MonoBehaviour
     [SerializeField] private AudioSource changeChoiceSE;
     // 設定パネルを開いた音・閉じた音（README 7.4.4）
     [SerializeField] private AudioSource displayHideModalSE;
+    // 選択肢を決めた音・自由入力を送信した音（README 7.4.5）
+    [SerializeField] private AudioSource decideSE;
 
     [Header("Player")]
     [SerializeField] private ThirdPersonController playerController;
@@ -573,6 +575,7 @@ public class DialogueManager : MonoBehaviour
         if (ChoiceSubmitPressed())
         {
             choicePanel.SetActive(false);
+            PlaySE(decideSE);
 
             ExperimentLogger.Log("choice_select", npcId: CurrentNpcId, nodeId: currentNodeId,
                 text: choices[choiceIndex].text, choiceIndex: choiceIndex);
@@ -720,6 +723,7 @@ public class DialogueManager : MonoBehaviour
         string text = inputField.text;
 
         inputPanel.SetActive(false);
+        PlaySE(decideSE);
 
         string npcId = CurrentNpcId;
         int nodeId = currentNodeId;
